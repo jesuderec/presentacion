@@ -11,6 +11,7 @@ import docx
 from pypdf import PdfReader
 from PIL import Image
 import io
+import re
 
 # Configuración básica de registro
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -28,17 +29,15 @@ except Exception as e:
     st.error(f"Error inesperado al cargar la clave de API: {e}")
     st.stop()
 
-
-def get_template_files():
+def optimize_text_for_ai(text_content):
     """
-    Obtiene la lista de archivos de plantilla .pptx en la carpeta assets/templates.
+    Limpia y optimiza el texto de entrada para reducir el consumo de tokens.
     """
-    template_dir = "assets/templates"
-    if not os.path.exists(template_dir):
-        return []
-    
-    templates = [f for f in os.listdir(template_dir) if f.endswith('.pptx')]
-    return templates
+    logging.info("Optimizando texto de entrada...")
+    # Eliminar múltiples espacios en blanco y saltos de línea innecesarios
+    optimized_text = re.sub(r'\s+', ' ', text_content).strip()
+    logging.info("Texto optimizado con éxito.")
+    return optimized_text
 
 def generate_slides_data_with_ai(text_content, num_slides):
     """
@@ -46,6 +45,7 @@ def generate_slides_data_with_ai(text_content, num_slides):
     incluyendo títulos, bullets, narrativa y referencias.
     """
     logging.info("Generando esquema de diapositivas con DeepSeek...")
+    optimized_text = optimize_text_for_ai(text_content)
     try:
         headers = {
             'Content-Type': 'application/json',
@@ -58,7 +58,7 @@ def generate_slides_data_with_ai(text_content, num_slides):
         - "slides" debe ser un array de objetos. Cada objeto debe tener las claves: "title" (título de la diapositiva), "bullets" (una lista de puntos clave), y "narrative" (un párrafo detallado para que un presentador lo lea).
         - "references" debe ser una lista de cadenas de texto con las referencias bibliográficas que encuentres en el texto de entrada. Si no hay, la lista debe estar vacía.
         El texto a analizar es:
-        "{text_content}"
+        "{optimized_text}"
         """
         payload = {
             "model": "deepseek-coder",
@@ -209,7 +209,7 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle):
         title_shape.left = round((slide_width - title_shape.width) / 2)
         title_shape.top = round((prs.slide_height - title_shape.height) / 2)
     else:
-        textbox = final_slide.shapes.add_textbox(Inches(19 / 2.54), Inches(16 / 2.54), Inches(5.5 / 2.54), Inches(7.3 / 2.54))
+        textbox = final_slide.shapes.add_textbox(Inches(1), Inches(1), Inches(8), Inches(2))
         tf = textbox.text_frame
         p = tf.paragraphs[0]
         run = p.add_run()
