@@ -206,4 +206,61 @@ if st.button("Generar Presentación"):
     elif text_input:
         text_to_process = text_input
         
-    if not text_to_
+    if not text_to_process:
+        st.warning("Por favor, introduce un texto o sube un archivo para generar la presentación.")
+        logging.warning("No se proporcionó texto ni archivo.")
+    else:
+        st.info("Iniciando el proceso de generación.")
+        with st.spinner("Procesando texto y generando presentación..."):
+            slides_data = generate_slides_data_with_ai(text_to_process, num_slides)
+            
+            if slides_data:
+                st.info("Datos de las diapositivas recibidos de la IA.")
+                with st.expander("📝 Narrativa y Referencias para el Presentador"):
+                    for i, slide in enumerate(slides_data.get("slides", [])):
+                        st.subheader(f"Diapositiva {i+1}: {slide['title']}")
+                        st.write(slide["narrative"])
+                        st.write("---")
+                    
+                    if slides_data.get("references"):
+                        st.subheader("📚 Referencias Bibliográficas")
+                        for ref in slides_data["references"]:
+                            st.write(f"- {ref}")
+                    else:
+                        st.info("No se encontraron referencias bibliográficas en el texto.")
+
+                narrative_full_text = ""
+                for i, slide in enumerate(slides_data.get("slides", [])):
+                    narrative_full_text += f"Diapositiva {i+1}: {slide['title']}\n\n"
+                    narrative_full_text += f"{slide['narrative']}\n\n"
+                    
+                if slides_data.get("references"):
+                    narrative_full_text += "Referencias Bibliográficas:\n"
+                    for ref in slides_data["references"]:
+                        narrative_full_text += f"- {ref}\n"
+
+                col1, col2 = st.columns(2)
+
+                prs = create_presentation(slides_data)
+                pptx_file = BytesIO()
+                prs.save(pptx_file)
+                pptx_file.seek(0)
+                
+                with col1:
+                    st.download_button(
+                        label="Descargar presentación (.pptx)",
+                        data=pptx_file,
+                        file_name="presentacion_ia_con_narrativa.pptx",
+                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                    )
+
+                with col2:
+                    st.download_button(
+                        label="Descargar narrativa (.txt)",
+                        data=narrative_full_text.encode('utf-8'),
+                        file_name="narrativa_presentacion.txt",
+                        mime="text/plain"
+                    )
+
+                st.success("¡Presentación y narrativa generadas con éxito!")
+                logging.info("Proceso de generación finalizado con éxito.")
