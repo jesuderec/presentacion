@@ -26,8 +26,6 @@ def get_api_key(model_name):
         return st.secrets["DEEPSEEK_API_KEY"]
     elif "gpt" in model_name:
         return st.secrets["OPENAI_API_KEY"]
-    elif "gemini" in model_name:
-        return st.secrets["GEMINI_API_KEY"]
     return None
 
 def setup_openai_client(api_key):
@@ -76,15 +74,6 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
                 messages=[{"role": "user", "content": prompt}]
             )
             ai_response_content = response.choices[0].message.content
-        elif "gemini" in model_name:
-            api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
-            headers['x-goog-api-key'] = api_key
-            payload = {
-                "contents": [{"parts": [{"text": prompt}]}]
-            }
-            response = requests.post(api_url, headers=headers, data=json.dumps(payload))
-            response.raise_for_status()
-            ai_response_content = response.json()["candidates"][0]["content"]["parts"][0]["text"]
         
         json_start = ai_response_content.find('{')
         json_end = ai_response_content.rfind('}') + 1
@@ -251,7 +240,7 @@ st.markdown("Crea una presentación y su guion a partir de tu texto o archivo.")
 
 model_text_option = st.selectbox(
     "Elige la IA para generar el texto:",
-    options=["deepseek-coder", "gpt-3.5-turbo", "gemini-1.5-pro"]
+    options=["deepseek-coder", "gpt-3.5-turbo"]
 )
 
 image_size_option = st.selectbox(
