@@ -15,7 +15,7 @@ from pypdf import PdfReader
 # DEEPSEEK_API_KEY = "tu_clave_real_de_deepseek"
 # OPENAI_API_KEY = "tu_clave_real_de_openai"
 
-def generate_slides_data_with_ai(text_content):
+def generate_slides_data_with_ai(text_content, num_slides):
     """
     Usa la IA de DeepSeek para generar un esquema de presentación,
     incluyendo títulos, bullets, narrativa y referencias.
@@ -26,8 +26,10 @@ def generate_slides_data_with_ai(text_content):
             'Content-Type': 'application/json',
             'Authorization': f'Bearer {api_key}'
         }
+        # PROMPT ACTUALIZADO para incluir el número de diapositivas
         prompt = f"""
         A partir del siguiente texto, genera un esquema de presentación en formato JSON.
+        El esquema debe tener un máximo de {num_slides} diapositivas.
         El esquema debe tener una estructura de un objeto con las claves: "slides" y "references".
         - "slides" debe ser un array de objetos. Cada objeto debe tener las claves: "title" (título de la diapositiva), "bullets" (una lista de puntos clave), y "narrative" (un párrafo detallado para que un presentador lo lea).
         - "references" debe ser una lista de cadenas de texto con las referencias bibliográficas que encuentres en el texto de entrada. Si no hay, la lista debe estar vacía.
@@ -88,7 +90,7 @@ def create_presentation(slides_data):
     title.text = "Presentación Generada por IA"
     
     for slide_info in slides_data.get("slides", []):
-        slide_layout = prs.slide_layouts[5] # Plantilla con imagen
+        slide_layout = prs.slide_layouts[1] # PLANTILLA CORREGIDA
         slide = prs.slides.add_slide(slide_layout)
         title_shape = slide.shapes.title
         title_shape.text = slide_info["title"]
@@ -137,6 +139,14 @@ def read_text_from_docx(uploaded_file):
 st.title("Generador de Presentaciones 🤖✨🖼️")
 st.markdown("Crea una presentación y su guion a partir de tu texto o archivo.")
 
+# Opción para elegir el número de diapositivas
+num_slides = st.slider(
+    "Número de diapositivas (excluyendo la portada):",
+    min_value=3,
+    max_value=10,
+    value=5
+)
+
 # Área para subir archivos
 uploaded_file = st.file_uploader(
     "Sube un archivo (.txt, .docx, .pdf)",
@@ -174,10 +184,9 @@ if st.button("Generar Presentación"):
         st.error("Por favor, configura tus claves de API en Streamlit Secrets.")
     else:
         with st.spinner("Procesando texto y generando presentación..."):
-            slides_data = generate_slides_data_with_ai(text_to_process)
+            slides_data = generate_slides_data_with_ai(text_to_process, num_slides)
             
             if slides_data:
-                # Muestra la narrativa y las referencias en la interfaz
                 with st.expander("📝 Narrativa y Referencias para el Presentador"):
                     for i, slide in enumerate(slides_data.get("slides", [])):
                         st.subheader(f"Diapositiva {i+1}: {slide['title']}")
