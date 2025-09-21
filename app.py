@@ -23,9 +23,11 @@ st.info("Iniciando la aplicación Streamlit...")
 # --- Configuración de la API ---
 def get_api_key(model_name):
     if model_name == "deepseek-coder":
-        return st.secrets["DEEPSEEK_API_KEY"]
+        return st.secrets.get("DEEPSEEK_API_KEY")
     elif "gpt" in model_name:
-        return st.secrets["OPENAI_API_KEY"]
+        return st.secrets.get("OPENAI_API_KEY")
+    elif "gemini" in model_name:
+        return st.secrets.get("GEMINI_API_KEY")
     return None
 
 def setup_openai_client(api_key):
@@ -51,7 +53,8 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
         prompt = f"""
         A partir del siguiente texto, genera un esquema de presentación en formato JSON.
         El esquema debe tener un máximo de {num_slides} diapositivas.
-        Cada diapositiva debe tener las claves: "title", "bullets" (una lista de puntos clave), y "narrative" (un párrafo detallado).
+        Cada diapositiva debe tener las claves: "title", "bullets" (una lista de puntos clave), "narrative" (un párrafo detallado).
+        Además, para cada diapositiva, genera una clave "image_description" con una descripción precisa para crear una imagen.
         El texto a analizar es:
         "{optimized_text}"
         """
@@ -74,6 +77,15 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
                 messages=[{"role": "user", "content": prompt}]
             )
             ai_response_content = response.choices[0].message.content
+        elif "gemini" in model_name:
+            api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent"
+            headers['x-goog-api-key'] = api_key
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}]
+            }
+            response = requests.post(api_url, headers=headers, data=json.dumps(payload))
+            response.raise_for_status()
+            ai_response_content = response.json()["candidates"][0]["content"]["parts"][0]["text"]
         
         json_start = ai_response_content.find('{')
         json_end = ai_response_content.rfind('}') + 1
@@ -85,30 +97,8 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
         logging.error(f"Error en generate_slides_data_with_ai: {e}")
         return None
 
-# --- Generación de imágenes con DALL-E ---
-def generate_image_with_dalle(prompt, size, api_key):
-    logging.info(f"Generando imagen con DALL-E de {size}...")
-    setup_openai_client(api_key)
-    try:
-        response = openai.images.generate(
-            model="dall-e-3",
-            prompt=prompt,
-            size=size,
-            quality="standard",
-            n=1
-        )
-        image_url = response.data[0].url
-        image_response = requests.get(image_url)
-        image_response.raise_for_status()
-        logging.info("Imagen generada con éxito.")
-        return Image.open(io.BytesIO(image_response.content))
-    except Exception as e:
-        st.error(f"Error al generar imagen con DALL-E: {e}")
-        logging.error(f"Error en generate_image_with_dalle: {e}")
-        return None
-
 # --- Funciones para crear presentación ---
-def create_presentation(slides_data, presentation_title, presentation_subtitle, image_size, model_text_option):
+def create_presentation(slides_data, presentation_title, presentation_subtitle):
     logging.info("Creando presentación PPTX con plantilla estándar.")
     prs = Presentation()
     
@@ -146,8 +136,6 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
 
     content_layout_index = 1
     
-    openai_api_key = get_api_key("gpt-3.5-turbo")
-    
     for slide_info in slides_data.get("slides", []):
         try:
             slide_layout = prs.slide_layouts[content_layout_index]
@@ -176,22 +164,7 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                 for bullet in bullets:
                     p = tf.add_paragraph()
                     p.text = bullet
-            
-            if openai_api_key:
-                prompt_imagen = f"Imagen minimalista para presentación educativa sobre {slide_info.get('title', '')}"
-                image = generate_image_with_dalle(prompt_imagen, size=image_size, api_key=openai_api_key)
-                if image:
-                    img_stream = io.BytesIO()
-                    image.save(img_stream, format='PNG')
-                    img_stream.seek(0)
-                    
-                    left_inches = 14 / 2.54
-                    top_inches = 7 / 2.54
-                    width_inches = 10 / 2.54
-                    height_inches = 11 / 2.54
-                    
-                    slide.shapes.add_picture(img_stream, Inches(left_inches), Inches(top_inches), width=Inches(width_inches), height=Inches(height_inches))
-
+        
         except IndexError:
             st.error(f"Error: La plantilla no tiene el layout de diapositiva {content_layout_index}. Usando un layout predeterminado.")
             fallback_layout = prs.slide_layouts[1]
@@ -240,12 +213,7 @@ st.markdown("Crea una presentación y su guion a partir de tu texto o archivo.")
 
 model_text_option = st.selectbox(
     "Elige la IA para generar el texto:",
-    options=["deepseek-coder", "gpt-3.5-turbo"]
-)
-
-image_size_option = st.selectbox(
-    "Elige la resolución de las imágenes (para DALL-E):",
-    options=["1024x1024", "1792x1024", "1024x1792"]
+    options=["deepseek-coder", "gpt-3.5-turbo", "gemini-1.5-pro"]
 )
 
 presentation_title = st.text_input("Título de la presentación:", value="")
@@ -307,7 +275,7 @@ if st.button("Generar Presentación", disabled=is_button_disabled):
             if slides_data:
                 st.info("Datos de las diapositivas recibidos de la IA.")
                 
-                prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_size_option, model_text_option)
+                prs = create_presentation(slides_data, presentation_title, presentation_subtitle)
                 
                 pptx_file = BytesIO()
                 prs.save(pptx_file)
@@ -318,6 +286,10 @@ if st.button("Generar Presentación", disabled=is_button_disabled):
                 for i, slide in enumerate(slides_data.get("slides", [])):
                     narrative_full_text += f"Diapositiva {i+1}: {slide['title']}\n\n"
                     narrative_full_text += f"{slide['narrative']}\n\n"
+                    
+                    # Añadir la descripción de la imagen a la narrativa
+                    if "image_description" in slide:
+                        narrative_full_text += f"Descripción de la imagen: {slide['image_description']}\n\n"
                 
                 if slides_data.get("references"):
                     narrative_full_text += "Referencias Bibliográficas:\n"
