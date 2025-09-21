@@ -18,6 +18,7 @@ import openai
 # Configuración básica de registro
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+st.info("Iniciando la aplicación Streamlit...")
 
 # --- Configuración de la API ---
 def get_api_key(model_name):
@@ -34,11 +35,14 @@ def setup_openai_client(api_key):
 
 # --- Optimización de texto ---
 def optimize_text_for_ai(text_content):
+    logging.info("Optimizando texto de entrada...")
     optimized_text = re.sub(r'\s+', ' ', text_content).strip()
+    logging.info("Texto optimizado con éxito.")
     return optimized_text
 
 # --- Generación de slides con la IA seleccionada ---
 def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
+    logging.info(f"Generando esquema de diapositivas con {model_name}...")
     optimized_text = optimize_text_for_ai(text_content)
     try:
         headers = {
@@ -85,9 +89,11 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
         json_start = ai_response_content.find('{')
         json_end = ai_response_content.rfind('}') + 1
         clean_json = ai_response_content[json_start:json_end]
+        logging.info("Esquema generado con éxito.")
         return json.loads(clean_json)
     except Exception as e:
         st.error(f"Error al procesar con la IA de texto: {e}")
+        logging.error(f"Error en generate_slides_data_with_ai: {e}")
         return None
 
 # --- Generación de imágenes con IA ---
@@ -254,6 +260,7 @@ st.title("Generador de Presentaciones 🤖✨🖼️")
 st.markdown("Crea una presentación y su guion a partir de tu texto o archivo.")
 st.markdown("---")
 
+# Controles en el cuerpo principal
 st.header("📄 Detalles de la Presentación")
 presentation_title = st.text_input("Título de la presentación:", value="")
 presentation_subtitle = st.text_input("Subtítulo (opcional):", value="")
@@ -327,7 +334,7 @@ if st.button("Generar Presentación", disabled=is_button_disabled):
             slides_data = generate_slides_data_with_ai(text_to_process, num_slides, model_text_option, selected_ai_key)
             
             if slides_data:
-                prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_size_option, image_model_option)
+                prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_size_option, image_model_option, model_text_option)
                 
                 pptx_file = BytesIO()
                 prs.save(pptx_file)
