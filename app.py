@@ -77,7 +77,7 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
             )
             ai_response_content = response.choices[0].message.content
         elif "gemini" in model_name:
-            api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent"
+            api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
             headers['x-goog-api-key'] = api_key
             payload = {
                 "contents": [{"parts": [{"text": prompt}]}]
