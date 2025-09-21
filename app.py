@@ -29,6 +29,17 @@ except Exception as e:
     st.stop()
 
 
+def get_template_files():
+    """
+    Obtiene la lista de archivos de plantilla .pptx en la carpeta assets/templates.
+    """
+    template_dir = "assets/templates"
+    if not os.path.exists(template_dir):
+        return []
+    
+    templates = [f for f in os.listdir(template_dir) if f.endswith('.pptx')]
+    return templates
+
 def generate_slides_data_with_ai(text_content, num_slides):
     """
     Usa la IA de DeepSeek para generar un esquema de presentación,
