@@ -118,28 +118,31 @@ def create_presentation_from_template(slides_data, template_option):
     title_slide = prs.slides.add_slide(title_slide_layout)
     if title_slide.shapes.title is not None:
         title_slide.shapes.title.text = "Presentación Generada por IA"
+        title_slide.shapes.title.text_frame.paragraphs[0].font.size = Pt(44)
     else:
         textbox = title_slide.shapes.add_textbox(Inches(1), Inches(1), Inches(8), Inches(2))
         tf = textbox.text_frame
         p = tf.paragraphs[0]
         run = p.add_run()
         run.text = "Presentación Generada por IA"
-        run.font.size = Pt(32)
+        run.font.size = Pt(44)
 
-    content_layout_index = 1
+    # Contenido
     placeholder_image = get_placeholder_image()
 
     for slide_info in slides_data.get("slides", []):
         try:
-            slide_layout = prs.slide_layouts[content_layout_index]
+            slide_layout = prs.slide_layouts[1]
             slide = prs.slides.add_slide(slide_layout)
             
             # Título
             if slide.shapes.title:
                 slide.shapes.title.text = slide_info.get("title", "")
+                slide.shapes.title.text_frame.paragraphs[0].font.size = Pt(40)
             else:
                 textbox = slide.shapes.add_textbox(Inches(1), Inches(0.5), Inches(8), Inches(1))
                 textbox.text = slide_info.get("title", "")
+                textbox.text_frame.paragraphs[0].font.size = Pt(40)
 
             # Bullets
             bullets = slide_info.get("bullets", [])
@@ -151,31 +154,50 @@ def create_presentation_from_template(slides_data, template_option):
 
             if body_shape:
                 body_shape.text = "\n".join(bullets)
+                body_shape.text_frame.paragraphs[0].font.size = Pt(10)
             else:
                 textbox = slide.shapes.add_textbox(Inches(1), Inches(1.5), Inches(8), Inches(4))
                 tf = textbox.text_frame
                 for bullet in bullets:
                     p = tf.add_paragraph()
                     p.text = bullet
+                    p.font.size = Pt(10)
             
             if placeholder_image:
                 img_stream = io.BytesIO()
                 placeholder_image.save(img_stream, format='PNG')
                 img_stream.seek(0)
                 
-                left = Inches(6)
-                top = Inches(1.5)
-                height = Inches(4)
-                width = Inches(4)
+                # Conversión de cm a pulgadas (1 pulgada = 2.54 cm)
+                img_left = Inches(19 / 2.54) # Ejemplo de posicionamiento
+                img_top = Inches(16 / 2.54)
+                img_width = Inches(10 / 2.54)
+                img_height = Inches(11 / 2.54)
                 
-                slide.shapes.add_picture(img_stream, left, top, height=height, width=width)
+                slide.shapes.add_picture(img_stream, img_left, img_top, width=img_width, height=img_height)
         except IndexError:
-            st.error(f"Error: La plantilla no tiene el layout de diapositiva {content_layout_index}. Usando un layout predeterminado.")
+            st.error(f"Error: La plantilla no tiene el layout de diapositiva 1. Usando un layout predeterminado.")
             fallback_layout = prs.slide_layouts[1]
             slide = prs.slides.add_slide(fallback_layout)
             slide.shapes.title.text = slide_info["title"]
             body_shape = slide.placeholders[1]
             body_shape.text = "\n".join(slide_info["bullets"])
+    
+    # Diapositiva final de "Gracias"
+    final_slide_layout = prs.slide_layouts[0]
+    final_slide = prs.slides.add_slide(final_slide_layout)
+
+    # Título "Gracias"
+    if final_slide.shapes.title is not None:
+        final_slide.shapes.title.text = "¡Gracias!"
+        final_slide.shapes.title.text_frame.paragraphs[0].font.size = Pt(72)
+    else:
+        textbox = final_slide.shapes.add_textbox(Inches(5.5 / 2.54), Inches(7.3 / 2.54), Inches(1), Inches(1))
+        tf = textbox.text_frame
+        p = tf.paragraphs[0]
+        run = p.add_run()
+        run.text = "¡Gracias!"
+        run.font.size = Pt(72)
     
     logging.info("Presentación creada con éxito.")
     return prs
