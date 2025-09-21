@@ -10,7 +10,7 @@ from PIL import Image
 import io
 import docx
 from pypdf import PdfReader
-import google.generativeai as genai
+# Removida la importación de google.generativeai
 
 # Configuración básica de registro
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -21,16 +21,14 @@ st.info("Iniciando la aplicación Streamlit...")
 # Usa st.secrets para las claves
 try:
     deepseek_api_key = st.secrets["DEEPSEEK_API_KEY"]
-    google_api_key = st.secrets["GOOGLE_API_KEY"]
-    genai.configure(api_key=google_api_key)
-    st.info("Claves de API cargadas con éxito.")
+    # Removida la configuración de la API de Google
+    st.info("Clave de API de DeepSeek cargada con éxito.")
 except KeyError as e:
     st.error(f"Error: La clave de API '{e.args[0]}' no se encontró en Streamlit Secrets. Por favor, configura tus claves.")
     st.stop()
 except Exception as e:
-    st.error(f"Error inesperado al configurar la API de Google: {e}")
+    st.error(f"Error inesperado al cargar la clave de API: {e}")
     st.stop()
-
 
 def generate_slides_data_with_ai(text_content, num_slides):
     """
@@ -71,42 +69,28 @@ def generate_slides_data_with_ai(text_content, num_slides):
         logging.error(f"Error en generate_slides_data_with_ai: {e}")
         return None
 
-def generate_image_with_gemini_ecosystem(prompt):
+def get_placeholder_image():
     """
-    Genera una imagen usando la API de Google AI Studio (Gemini Ecosystem).
+    Obtiene la imagen de placeholder para la presentación.
     """
-    logging.info("Generando imagen con Gemini ecosistema...")
+    logging.info("Cargando imagen de placeholder...")
     try:
-        model = genai.GenerativeModel('gemini-pro')
-        response = model.generate_content(f"Genera una descripción muy breve y un URL de imagen de stock para '{prompt}'. Ejemplo: 'Imagen de un paisaje. https://example.com/paisaje.jpg'")
-        
-        text_response = response.text
-        if "http" in text_response:
-            url_start = text_response.find("http")
-            url_end = text_response.find(" ", url_start) if " " in text_response[url_start:] else len(text_response)
-            image_url = text_response[url_start:url_end].strip()
-            
-            if image_url and (image_url.startswith("http") and ("example.com" not in image_url)):
-                st.info(f"Usando URL generada por Gemini: {image_url}")
-                logging.info(f"URL de imagen generada: {image_url}")
-                image_response = requests.get(image_url)
-                image_response.raise_for_status()
-                return Image.open(io.BytesIO(image_response.content))
-            else:
-                st.warning("No se pudo obtener una URL de imagen real de Gemini, usando imagen de placeholder.")
-                return Image.open("assets/images/placeholder.png")
-        else:
-            st.warning("Gemini no proporcionó una URL. Usando imagen de placeholder.")
-            return Image.open("assets/images/placeholder.png")
-
+        # La ruta del archivo es relativa a la raíz del repositorio
+        image_path = "assets/images/placeholder.png"
+        return Image.open(image_path)
+    except FileNotFoundError:
+        st.error(f"Error: No se encontró el archivo de imagen en la ruta: {image_path}")
+        logging.error("No se encontró el archivo de imagen de placeholder.")
+        return None
     except Exception as e:
-        st.error(f"Error al generar imagen con Gemini (o al simularla): {e}")
-        logging.error(f"Error en generate_image_with_gemini_ecosystem: {e}")
-        return Image.open("assets/images/placeholder.png")
+        st.error(f"Error al cargar la imagen de placeholder: {e}")
+        logging.error(f"Error al cargar la imagen: {e}")
+        return None
+
 
 def create_presentation(slides_data):
     """
-    Crea una presentación de PowerPoint con contenido e imágenes.
+    Crea una presentación de PowerPoint con contenido e imágenes de placeholder.
     """
     logging.info("Creando presentación PPTX...")
     prs = Presentation()
@@ -114,6 +98,8 @@ def create_presentation(slides_data):
     slide = prs.slides.add_slide(title_slide_layout)
     title = slide.shapes.title
     title.text = "Presentación Generada por IA"
+    
+    placeholder_image = get_placeholder_image()
     
     for slide_info in slides_data.get("slides", []):
         slide_layout = prs.slide_layouts[1]
@@ -125,12 +111,9 @@ def create_presentation(slides_data):
         content_text = "\n".join(slide_info["bullets"])
         body_shape.text = content_text
         
-        prompt_imagen = f"Imagen minimalista para presentación educativa sobre {slide_info['title']}"
-        image = generate_image_with_gemini_ecosystem(prompt_imagen)
-        
-        if image:
+        if placeholder_image:
             img_stream = io.BytesIO()
-            image.save(img_stream, format='PNG')
+            placeholder_image.save(img_stream, format='PNG')
             img_stream.seek(0)
             
             left = Inches(6)
