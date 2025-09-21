@@ -78,3 +78,132 @@ def generate_image_with_gemini_ecosystem(prompt):
     logging.info("Generando imagen con Gemini ecosistema...")
     try:
         model = genai.GenerativeModel('gemini-pro')
+        response = model.generate_content(f"Genera una descripción muy breve y un URL de imagen de stock para '{prompt}'. Ejemplo: 'Imagen de un paisaje. https://example.com/paisaje.jpg'")
+        
+        text_response = response.text
+        if "http" in text_response:
+            url_start = text_response.find("http")
+            url_end = text_response.find(" ", url_start) if " " in text_response[url_start:] else len(text_response)
+            image_url = text_response[url_start:url_end].strip()
+            
+            if image_url and (image_url.startswith("http") and ("example.com" not in image_url)):
+                st.info(f"Usando URL generada por Gemini: {image_url}")
+                logging.info(f"URL de imagen generada: {image_url}")
+                image_response = requests.get(image_url)
+                image_response.raise_for_status()
+                return Image.open(io.BytesIO(image_response.content))
+            else:
+                st.warning("No se pudo obtener una URL de imagen real de Gemini, usando imagen de placeholder.")
+                return Image.open("assets/images/placeholder.png")
+        else:
+            st.warning("Gemini no proporcionó una URL. Usando imagen de placeholder.")
+            return Image.open("assets/images/placeholder.png")
+
+    except Exception as e:
+        st.error(f"Error al generar imagen con Gemini (o al simularla): {e}")
+        logging.error(f"Error en generate_image_with_gemini_ecosystem: {e}")
+        return Image.open("assets/images/placeholder.png")
+
+def create_presentation(slides_data):
+    """
+    Crea una presentación de PowerPoint con contenido e imágenes.
+    """
+    logging.info("Creando presentación PPTX...")
+    prs = Presentation()
+    title_slide_layout = prs.slide_layouts[0]
+    slide = prs.slides.add_slide(title_slide_layout)
+    title = slide.shapes.title
+    title.text = "Presentación Generada por IA"
+    
+    for slide_info in slides_data.get("slides", []):
+        slide_layout = prs.slide_layouts[1]
+        slide = prs.slides.add_slide(slide_layout)
+        title_shape = slide.shapes.title
+        title_shape.text = slide_info["title"]
+        
+        body_shape = slide.placeholders[1]
+        content_text = "\n".join(slide_info["bullets"])
+        body_shape.text = content_text
+        
+        prompt_imagen = f"Imagen minimalista para presentación educativa sobre {slide_info['title']}"
+        image = generate_image_with_gemini_ecosystem(prompt_imagen)
+        
+        if image:
+            img_stream = io.BytesIO()
+            image.save(img_stream, format='PNG')
+            img_stream.seek(0)
+            
+            left = Inches(6)
+            top = Inches(1.5)
+            height = Inches(4)
+            width = Inches(4)
+            
+            slide.shapes.add_picture(img_stream, left, top, height=height, width=width)
+
+    logging.info("Presentación creada con éxito.")
+    return prs
+
+# --- Funciones para leer archivos ---
+
+def read_text_from_txt(uploaded_file):
+    logging.info("Leyendo archivo TXT...")
+    return uploaded_file.read().decode("utf-8")
+
+def read_text_from_pdf(uploaded_file):
+    logging.info("Leyendo archivo PDF...")
+    reader = PdfReader(uploaded_file)
+    text = ""
+    for page in reader.pages:
+        text += page.extract_text()
+    return text
+
+def read_text_from_docx(uploaded_file):
+    logging.info("Leyendo archivo DOCX...")
+    doc = docx.Document(uploaded_file)
+    text = ""
+    for paragraph in doc.paragraphs:
+        text += paragraph.text + "\n"
+    return text
+
+# --- Interfaz de Streamlit ---
+st.title("Generador de Presentaciones 🤖✨🖼️")
+st.markdown("Crea una presentación y su guion a partir de tu texto o archivo.")
+
+num_slides = st.slider(
+    "Número de diapositivas (excluyendo la portada):",
+    min_value=3,
+    max_value=10,
+    value=5
+)
+
+uploaded_file = st.file_uploader(
+    "Sube un archivo (.txt, .docx, .pdf)",
+    type=["txt", "docx", "pdf"]
+)
+st.markdown("---")
+st.markdown("O pega tu texto directamente aquí:")
+
+text_input = st.text_area(
+    "Pega tu texto aquí",
+    height=200,
+    placeholder="Ej. El ciclo del agua es el proceso de...\n..."
+)
+
+if st.button("Generar Presentación"):
+    st.info("Botón 'Generar Presentación' presionado.")
+    text_to_process = ""
+    
+    if uploaded_file is not None:
+        file_extension = uploaded_file.name.split(".")[-1].lower()
+        
+        if file_extension == "txt":
+            text_to_process = read_text_from_txt(uploaded_file)
+        elif file_extension == "docx":
+            text_to_process = read_text_from_docx(uploaded_file)
+        elif file_extension == "pdf":
+            text_to_process = read_text_from_pdf(uploaded_file)
+        
+    elif text_input:
+        text_to_process = text_input
+        
+    if not text_to_
