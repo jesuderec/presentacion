@@ -10,10 +10,19 @@ import io
 import docx
 from pypdf import PdfReader
 
+# Importa la librería de Google Generative AI
+import google.generativeai as genai
+
 # --- Configuración de la API ---
 # Asegúrate de que tus claves de API estén configuradas en Streamlit Secrets
 # DEEPSEEK_API_KEY = "tu_clave_real_de_deepseek"
-# OPENAI_API_KEY = "tu_clave_real_de_openai"
+# GOOGLE_API_KEY = "tu_clave_real_de_google_gemini_o_ai_studio" # Nueva clave para Google/Gemini
+
+# Configura la API de Google Generative AI
+if "GOOGLE_API_KEY" in st.secrets:
+    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+else:
+    st.error("GOOGLE_API_KEY no encontrada en Streamlit Secrets. Configúrala para la generación de imágenes.")
 
 def generate_slides_data_with_ai(text_content, num_slides):
     """
@@ -26,7 +35,6 @@ def generate_slides_data_with_ai(text_content, num_slides):
             'Content-Type': 'application/json',
             'Authorization': f'Bearer {api_key}'
         }
-        # PROMPT ACTUALIZADO para incluir el número de diapositivas
         prompt = f"""
         A partir del siguiente texto, genera un esquema de presentación en formato JSON.
         El esquema debe tener un máximo de {num_slides} diapositivas.
@@ -53,31 +61,36 @@ def generate_slides_data_with_ai(text_content, num_slides):
         st.error(f"Error al procesar con la IA de texto: {e}")
         return None
 
-def generate_image_with_dalle(prompt):
+def generate_image_with_gemini_ecosystem(prompt):
     """
-    Genera una imagen con DALL·E a partir de un prompt de texto.
+    Genera una imagen usando la API de Google AI Studio (Gemini Ecosystem).
     """
     try:
-        api_key = st.secrets["OPENAI_API_KEY"]
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-        payload = {
-            "model": "dall-e-3",
-            "prompt": prompt,
-            "n": 1,
-            "size": "1024x1024"
-        }
-        response = requests.post("https://api.openai.com/v1/images/generations", headers=headers, json=payload)
-        response.raise_for_status()
-        image_url = response.json()["data"][0]["url"]
-        image_response = requests.get(image_url)
-        image_response.raise_for_status()
-        return Image.open(io.BytesIO(image_response.content))
+        model = genai.GenerativeModel('gemini-pro')
+        response = model.generate_content(f"Genera una descripción muy breve y un URL de imagen de stock para '{prompt}'. Ejemplo: 'Imagen de un paisaje. https://example.com/paisaje.jpg'")
+        
+        text_response = response.text
+        if "http" in text_response:
+            url_start = text_response.find("http")
+            url_end = text_response.find(" ", url_start) if " " in text_response[url_start:] else len(text_response)
+            image_url = text_response[url_start:url_end].strip()
+            
+            if image_url and (image_url.startswith("http") and ("example.com" not in image_url)):
+                st.info(f"Usando URL generada por Gemini: {image_url}")
+                image_response = requests.get(image_url)
+                image_response.raise_for_status()
+                return Image.open(io.BytesIO(image_response.content))
+            else:
+                st.warning("No se pudo obtener una URL de imagen real de Gemini, usando imagen de placeholder.")
+                # Asegúrate de tener una carpeta assets/images/ con una imagen placeholder.png
+                return Image.open("assets/images/placeholder.png")
+        else:
+            st.warning("Gemini no proporcionó una URL. Usando imagen de placeholder.")
+            return Image.open("assets/images/placeholder.png")
+
     except Exception as e:
-        st.error(f"Error al generar imagen con DALL·E: {e}")
-        return None
+        st.error(f"Error al generar imagen con Gemini (o al simularla): {e}")
+        return Image.open("assets/images/placeholder.png")
 
 def create_presentation(slides_data):
     """
@@ -90,7 +103,7 @@ def create_presentation(slides_data):
     title.text = "Presentación Generada por IA"
     
     for slide_info in slides_data.get("slides", []):
-        slide_layout = prs.slide_layouts[1] # PLANTILLA CORREGIDA
+        slide_layout = prs.slide_layouts[1]
         slide = prs.slides.add_slide(slide_layout)
         title_shape = slide.shapes.title
         title_shape.text = slide_info["title"]
@@ -99,17 +112,21 @@ def create_presentation(slides_data):
         content_text = "\n".join(slide_info["bullets"])
         body_shape.text = content_text
         
-        # Generación de la imagen
+        # Generación de la imagen con el ecosistema Gemini
         prompt_imagen = f"Imagen minimalista para presentación educativa sobre {slide_info['title']}"
-        image = generate_image_with_dalle(prompt_imagen)
+        image = generate_image_with_gemini_ecosystem(prompt_imagen)
         
         if image:
             img_stream = io.BytesIO()
             image.save(img_stream, format='PNG')
             img_stream.seek(0)
             
-            left = top = Inches(5)
-            slide.shapes.add_picture(img_stream, left, top)
+            left = Inches(6)
+            top = Inches(1.5)
+            height = Inches(4)
+            width = Inches(4)
+            
+            slide.shapes.add_picture(img_stream, left, top, height=height, width=width)
 
     return prs
 
@@ -139,7 +156,6 @@ def read_text_from_docx(uploaded_file):
 st.title("Generador de Presentaciones 🤖✨🖼️")
 st.markdown("Crea una presentación y su guion a partir de tu texto o archivo.")
 
-# Opción para elegir el número de diapositivas
 num_slides = st.slider(
     "Número de diapositivas (excluyendo la portada):",
     min_value=3,
@@ -147,7 +163,6 @@ num_slides = st.slider(
     value=5
 )
 
-# Área para subir archivos
 uploaded_file = st.file_uploader(
     "Sube un archivo (.txt, .docx, .pdf)",
     type=["txt", "docx", "pdf"]
@@ -155,7 +170,6 @@ uploaded_file = st.file_uploader(
 st.markdown("---")
 st.markdown("O pega tu texto directamente aquí:")
 
-# Área de texto para la entrada manual
 text_input = st.text_area(
     "Pega tu texto aquí",
     height=200,
@@ -180,7 +194,7 @@ if st.button("Generar Presentación"):
         
     if not text_to_process:
         st.warning("Por favor, introduce un texto o sube un archivo para generar la presentación.")
-    elif "DEEPSEEK_API_KEY" not in st.secrets or "OPENAI_API_KEY" not in st.secrets:
+    elif "DEEPSEEK_API_KEY" not in st.secrets or "GOOGLE_API_KEY" not in st.secrets:
         st.error("Por favor, configura tus claves de API en Streamlit Secrets.")
     else:
         with st.spinner("Procesando texto y generando presentación..."):
