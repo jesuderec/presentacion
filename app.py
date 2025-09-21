@@ -10,7 +10,6 @@ from PIL import Image
 import io
 import docx
 from pypdf import PdfReader
-# Removida la importación de google.generativeai
 
 # Configuración básica de registro
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -75,11 +74,10 @@ def get_placeholder_image():
     """
     logging.info("Cargando imagen de placeholder...")
     try:
-        # La ruta del archivo es relativa a la raíz del repositorio
         image_path = "assets/images/placeholder.png"
         return Image.open(image_path)
     except FileNotFoundError:
-        st.error(f"Error: No se encontró el archivo de imagen en la ruta: {image_path}")
+        st.error(f"Error: No se encontró el archivo de imagen en la ruta: {image_path}. Asegúrate de subirlo a tu repositorio.")
         logging.error("No se encontró el archivo de imagen de placeholder.")
         return None
     except Exception as e:
@@ -88,41 +86,66 @@ def get_placeholder_image():
         return None
 
 
-def create_presentation(slides_data):
+def create_presentation_from_template(slides_data, template_option):
     """
-    Crea una presentación de PowerPoint con contenido e imágenes de placeholder.
+    Crea una presentación de PowerPoint basada en la opción de plantilla seleccionada.
     """
-    logging.info("Creando presentación PPTX...")
-    prs = Presentation()
-    title_slide_layout = prs.slide_layouts[0]
-    slide = prs.slides.add_slide(title_slide_layout)
-    title = slide.shapes.title
-    title.text = "Presentación Generada por IA"
+    logging.info(f"Creando presentación PPTX con la opción: {template_option}")
+    
+    if template_option == "Utilizar mi plantilla personalizada":
+        template_path = "assets/templates/template.pptx"
+        if not os.path.exists(template_path):
+            st.warning("No se encontró la plantilla personalizada. Creando una presentación estándar en su lugar.")
+            prs = Presentation()
+        else:
+            prs = Presentation(template_path)
+    else: # Opciones "Utilizar plantilla estándar" y "Salida estándar"
+        prs = Presentation()
+    
+    # Obtener el layout correcto según la opción
+    if template_option == "Salida estándar (solo contenido)":
+        title_slide_layout = prs.slide_layouts[0]
+        title_slide = prs.slides.add_slide(title_slide_layout)
+        title_slide.shapes.title.text = "Presentación Generada por IA"
+        content_layout_index = 1
+    else: # Plantilla personalizada o estándar
+        title_slide_layout = prs.slide_layouts[0]
+        title_slide = prs.slides.add_slide(title_slide_layout)
+        title_slide.shapes.title.text = "Presentación Generada por IA"
+        content_layout_index = 1
     
     placeholder_image = get_placeholder_image()
-    
-    for slide_info in slides_data.get("slides", []):
-        slide_layout = prs.slide_layouts[1]
-        slide = prs.slides.add_slide(slide_layout)
-        title_shape = slide.shapes.title
-        title_shape.text = slide_info["title"]
-        
-        body_shape = slide.placeholders[1]
-        content_text = "\n".join(slide_info["bullets"])
-        body_shape.text = content_text
-        
-        if placeholder_image:
-            img_stream = io.BytesIO()
-            placeholder_image.save(img_stream, format='PNG')
-            img_stream.seek(0)
-            
-            left = Inches(6)
-            top = Inches(1.5)
-            height = Inches(4)
-            width = Inches(4)
-            
-            slide.shapes.add_picture(img_stream, left, top, height=height, width=width)
 
+    for slide_info in slides_data.get("slides", []):
+        try:
+            slide_layout = prs.slide_layouts[content_layout_index]
+            slide = prs.slides.add_slide(slide_layout)
+            title_shape = slide.shapes.title
+            title_shape.text = slide_info["title"]
+            
+            body_shape = slide.placeholders[1]
+            content_text = "\n".join(slide_info["bullets"])
+            body_shape.text = content_text
+            
+            if placeholder_image:
+                img_stream = io.BytesIO()
+                placeholder_image.save(img_stream, format='PNG')
+                img_stream.seek(0)
+                
+                left = Inches(6)
+                top = Inches(1.5)
+                height = Inches(4)
+                width = Inches(4)
+                
+                slide.shapes.add_picture(img_stream, left, top, height=height, width=width)
+        except IndexError:
+            st.error(f"Error: La plantilla no tiene el layout de diapositiva {content_layout_index}. Usando un layout predeterminado.")
+            fallback_layout = prs.slide_layouts[1]
+            slide = prs.slides.add_slide(fallback_layout)
+            slide.shapes.title.text = slide_info["title"]
+            body_shape = slide.placeholders[1]
+            body_shape.text = "\n".join(slide_info["bullets"])
+    
     logging.info("Presentación creada con éxito.")
     return prs
 
@@ -159,6 +182,15 @@ num_slides = st.slider(
     value=5
 )
 
+template_option = st.selectbox(
+    "Elige una opción de plantilla:",
+    options=[
+        "Utilizar plantilla estándar (Python PPTX)",
+        "Utilizar mi plantilla personalizada",
+        "Salida estándar (solo contenido)"
+    ]
+)
+
 uploaded_file = st.file_uploader(
     "Sube un archivo (.txt, .docx, .pdf)",
     type=["txt", "docx", "pdf"]
@@ -172,7 +204,6 @@ text_input = st.text_area(
     placeholder="Ej. El ciclo del agua es el proceso de...\n..."
 )
 
-# Inicializar st.session_state
 if 'presentation_data' not in st.session_state:
     st.session_state.presentation_data = None
     st.session_state.narrative_data = None
@@ -206,14 +237,13 @@ if st.button("Generar Presentación"):
             if slides_data:
                 st.info("Datos de las diapositivas recibidos de la IA.")
                 
-                # Generar la presentación y guardar en el estado de la sesión
-                prs = create_presentation(slides_data)
+                prs = create_presentation_from_template(slides_data, template_option)
+                
                 pptx_file = BytesIO()
                 prs.save(pptx_file)
                 pptx_file.seek(0)
                 st.session_state.presentation_data = pptx_file
                 
-                # Generar la narrativa y guardarla en el estado de la sesión
                 narrative_full_text = ""
                 for i, slide in enumerate(slides_data.get("slides", [])):
                     narrative_full_text += f"Diapositiva {i+1}: {slide['title']}\n\n"
@@ -228,7 +258,6 @@ if st.button("Generar Presentación"):
                 st.success("¡Presentación y narrativa generadas con éxito!")
                 logging.info("Proceso de generación finalizado con éxito.")
 
-# Mostrar los botones de descarga si los datos existen en el estado de la sesión
 if st.session_state.presentation_data is not None:
     with st.expander("📝 Narrativa y Referencias para el Presentador"):
         st.write(st.session_state.narrative_data.decode('utf-8'))
