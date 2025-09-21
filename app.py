@@ -10,19 +10,10 @@ import io
 import docx
 from pypdf import PdfReader
 
-# Importa la librería de Google Generative AI
-import google.generativeai as genai
-
 # --- Configuración de la API ---
 # Asegúrate de que tus claves de API estén configuradas en Streamlit Secrets
 # DEEPSEEK_API_KEY = "tu_clave_real_de_deepseek"
-# GOOGLE_API_KEY = "tu_clave_real_de_google_gemini_o_ai_studio" # Nueva clave para Google/Gemini
-
-# Configura la API de Google Generative AI
-if "GOOGLE_API_KEY" in st.secrets:
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-else:
-    st.error("GOOGLE_API_KEY no encontrada en Streamlit Secrets. Configúrala para la generación de imágenes.")
+# OPENAI_API_KEY = "tu_clave_real_de_openai"
 
 def generate_slides_data_with_ai(text_content, num_slides):
     """
@@ -35,6 +26,7 @@ def generate_slides_data_with_ai(text_content, num_slides):
             'Content-Type': 'application/json',
             'Authorization': f'Bearer {api_key}'
         }
+        # PROMPT ACTUALIZADO para incluir el número de diapositivas
         prompt = f"""
         A partir del siguiente texto, genera un esquema de presentación en formato JSON.
         El esquema debe tener un máximo de {num_slides} diapositivas.
@@ -61,60 +53,31 @@ def generate_slides_data_with_ai(text_content, num_slides):
         st.error(f"Error al procesar con la IA de texto: {e}")
         return None
 
-def generate_image_with_gemini_ecosystem(prompt):
+def generate_image_with_dalle(prompt):
     """
-    Genera una imagen usando la API de Google AI Studio (Gemini Ecosystem).
-    Requiere un modelo de generación de imágenes específico, como 'Imagen' u otro.
-    Para este ejemplo, intentaremos usar una API genérica si Google Generative AI lo soporta.
-    Nota: La API de Google AI Studio no tiene una función directa para generar imágenes
-    de texto como DALL-E, pero esto se puede lograr con la API de Imagen de Google Cloud
-    o si Gemini Pro Vision tuviera una capacidad de salida directa de imágenes generadas.
-    Para este ejemplo, haremos una aproximación usando el modelo "gemini-pro"
-    para generar una 'descripción' de la imagen, que luego 'simulamos' como si fuera la imagen.
-    En una implementación real, aquí iría la llamada a la API de Imagen de Google.
-
-    Dado que Gemini Pro no genera imágenes directamente desde la API como output,
-    y para cumplir el requerimiento de "entregue Gemini", simularemos
-    una URL de imagen que luego podríamos usar para descargar una imagen de stock o un placeholder,
-    o en un entorno de Google Cloud real, se llamaría a la API de Imagen.
+    Genera una imagen con DALL·E a partir de un prompt de texto.
     """
     try:
-        # Esto es una SIMULACIÓN de generación de URL de imagen,
-        # ya que gemini-pro no genera la imagen BINARIA directamente.
-        # En un escenario real, llamarías a la API de Imagen de Google Cloud
-        # para obtener una URL de imagen o los bytes directamente.
-        model = genai.GenerativeModel('gemini-pro')
-        response = model.generate_content(f"Genera una descripción muy breve y un URL de imagen de stock para '{prompt}'. Ejemplo: 'Imagen de un paisaje. https://example.com/paisaje.jpg'")
-        
-        # Intentamos extraer una URL simple de la respuesta
-        text_response = response.text
-        # Una forma muy básica de extraer una URL, puede requerir refinamiento
-        if "http" in text_response:
-            url_start = text_response.find("http")
-            url_end = text_response.find(" ", url_start) if " " in text_response[url_start:] else len(text_response)
-            image_url = text_response[url_start:url_end].strip()
-            
-            # Descargamos una imagen de stock de ejemplo si no es una URL válida (simulación)
-            # En un entorno real, descargarías la imagen generada por Google Imagen
-            if image_url and (image_url.startswith("http") and ("example.com" not in image_url)):
-                st.info(f"Usando URL generada por Gemini: {image_url}")
-                image_response = requests.get(image_url)
-                image_response.raise_for_status()
-                return Image.open(io.BytesIO(image_response.content))
-            else:
-                st.warning("No se pudo obtener una URL de imagen real de Gemini, usando imagen de placeholder.")
-                # Usar una imagen de placeholder si no se obtiene una URL válida
-                return Image.open("assets/images/placeholder.png") # Necesitas crear esta imagen
-        else:
-            st.warning("Gemini no proporcionó una URL. Usando imagen de placeholder.")
-            return Image.open("assets/images/placeholder.png") # Necesitas crear esta imagen
-
+        api_key = st.secrets["OPENAI_API_KEY"]
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "dall-e-3",
+            "prompt": prompt,
+            "n": 1,
+            "size": "1024x1024"
+        }
+        response = requests.post("https://api.openai.com/v1/images/generations", headers=headers, json=payload)
+        response.raise_for_status()
+        image_url = response.json()["data"][0]["url"]
+        image_response = requests.get(image_url)
+        image_response.raise_for_status()
+        return Image.open(io.BytesIO(image_response.content))
     except Exception as e:
-        st.error(f"Error al generar imagen con Gemini (o al simularla): {e}")
-        # Si falla, puedes devolver una imagen de placeholder o None
-        # Asegúrate de tener un archivo placeholder.png en assets/images/
-        return Image.open("assets/images/placeholder.png")
-
+        st.error(f"Error al generar imagen con DALL·E: {e}")
+        return None
 
 def create_presentation(slides_data):
     """
@@ -127,7 +90,7 @@ def create_presentation(slides_data):
     title.text = "Presentación Generada por IA"
     
     for slide_info in slides_data.get("slides", []):
-        slide_layout = prs.slide_layouts[1] # Plantilla "Título y Contenido" estándar
+        slide_layout = prs.slide_layouts[1] # PLANTILLA CORREGIDA
         slide = prs.slides.add_slide(slide_layout)
         title_shape = slide.shapes.title
         title_shape.text = slide_info["title"]
@@ -136,24 +99,17 @@ def create_presentation(slides_data):
         content_text = "\n".join(slide_info["bullets"])
         body_shape.text = content_text
         
-        # Generación de la imagen con el ecosistema Gemini
+        # Generación de la imagen
         prompt_imagen = f"Imagen minimalista para presentación educativa sobre {slide_info['title']}"
-        image = generate_image_with_gemini_ecosystem(prompt_imagen)
+        image = generate_image_with_dalle(prompt_imagen)
         
         if image:
             img_stream = io.BytesIO()
             image.save(img_stream, format='PNG')
             img_stream.seek(0)
             
-            # Posición de la imagen (ajusta según el diseño de tu plantilla)
-            left = Inches(6) # Ajusta la posición para que no se superponga con el texto
-            top = Inches(1.5)
-            height = Inches(4)
-            width = Inches(4)
-            
-            # La imagen se inserta en una posición fija, lo cual es simple.
-            # Para mejor control, se podría usar un placeholder de imagen si la plantilla lo tiene.
-            slide.shapes.add_picture(img_stream, left, top, height=height, width=width)
+            left = top = Inches(5)
+            slide.shapes.add_picture(img_stream, left, top)
 
     return prs
 
@@ -224,7 +180,7 @@ if st.button("Generar Presentación"):
         
     if not text_to_process:
         st.warning("Por favor, introduce un texto o sube un archivo para generar la presentación.")
-    elif "DEEPSEEK_API_KEY" not in st.secrets or "GOOGLE_API_KEY" not in st.secrets:
+    elif "DEEPSEEK_API_KEY" not in st.secrets or "OPENAI_API_KEY" not in st.secrets:
         st.error("Por favor, configura tus claves de API en Streamlit Secrets.")
     else:
         with st.spinner("Procesando texto y generando presentación..."):
