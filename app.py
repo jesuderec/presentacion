@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 st.info("Iniciando la aplicación Streamlit...")
 
-# --- Configuración de la API ---
+# --- Configuración de la API ----
 # Usa st.secrets para las claves
 try:
     deepseek_api_key = st.secrets["DEEPSEEK_API_KEY"]
