@@ -1,7 +1,7 @@
 import streamlit as st
 import logging
 from pptx import Presentation
-from pptx.util import Inches
+from pptx.util import Inches, Pt
 from io import BytesIO
 import requests
 import json
@@ -113,24 +113,47 @@ def create_presentation_from_template(slides_data, template_option):
             logging.error(f"Error al cargar la plantilla: {template_path}. Error: {e}")
             prs = Presentation()
     
+    # --- Crear portada ---
     title_slide_layout = prs.slide_layouts[0]
     title_slide = prs.slides.add_slide(title_slide_layout)
-    title_slide.shapes.title.text = "Presentación Generada por IA"
+
+    title_shape = title_slide.shapes.title
+    if title_shape is not None:
+        title_shape.text = "Presentación Generada por IA"
+    else:
+        textbox = title_slide.shapes.add_textbox(Inches(1), Inches(1), Inches(8), Inches(2))
+        text_frame = textbox.text_frame
+        p = text_frame.paragraphs[0]
+        run = p.add_run()
+        run.text = "Presentación Generada por IA"
+        run.font.size = Pt(32)
+
+    # --- Crear contenido ---
     content_layout_index = 1
-    
     placeholder_image = get_placeholder_image()
 
     for slide_info in slides_data.get("slides", []):
         try:
             slide_layout = prs.slide_layouts[content_layout_index]
             slide = prs.slides.add_slide(slide_layout)
-            title_shape = slide.shapes.title
-            title_shape.text = slide_info["title"]
-            
-            body_shape = slide.placeholders[1]
-            content_text = "\n".join(slide_info["bullets"])
-            body_shape.text = content_text
-            
+
+            # Título de la diapositiva
+            if slide.shapes.title:
+                slide.shapes.title.text = slide_info["title"]
+            else:
+                textbox = slide.shapes.add_textbox(Inches(1), Inches(0.5), Inches(8), Inches(1))
+                textbox.text = slide_info["title"]
+
+            # Bullets
+            try:
+                body_shape = slide.placeholders[1]
+                content_text = "\n".join(slide_info["bullets"])
+                body_shape.text = content_text
+            except IndexError:
+                textbox = slide.shapes.add_textbox(Inches(1), Inches(1.5), Inches(8), Inches(4))
+                textbox.text = "\n".join(slide_info["bullets"])
+
+            # Imagen placeholder
             if placeholder_image:
                 img_stream = io.BytesIO()
                 placeholder_image.save(img_stream, format='PNG')
@@ -142,13 +165,8 @@ def create_presentation_from_template(slides_data, template_option):
                 width = Inches(4)
                 
                 slide.shapes.add_picture(img_stream, left, top, height=height, width=width)
-        except IndexError:
-            st.error(f"Error: La plantilla no tiene el layout de diapositiva {content_layout_index}. Usando un layout predeterminado.")
-            fallback_layout = prs.slide_layouts[1]
-            slide = prs.slides.add_slide(fallback_layout)
-            slide.shapes.title.text = slide_info["title"]
-            body_shape = slide.placeholders[1]
-            body_shape.text = "\n".join(slide_info["bullets"])
+        except Exception as e:
+            st.error(f"Error al generar una diapositiva: {e}")
     
     logging.info("Presentación creada con éxito.")
     return prs
@@ -279,3 +297,5 @@ if st.session_state.presentation_data is not None:
             file_name="narrativa_presentacion.txt",
             mime="text/plain"
         )
+
+
