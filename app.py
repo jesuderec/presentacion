@@ -34,7 +34,6 @@ def optimize_text_for_ai(text_content):
     Limpia y optimiza el texto de entrada para reducir el consumo de tokens.
     """
     logging.info("Optimizando texto de entrada...")
-    # Eliminar múltiples espacios en blanco y saltos de línea innecesarios
     optimized_text = re.sub(r'\s+', ' ', text_content).strip()
     logging.info("Texto optimizado con éxito.")
     return optimized_text
@@ -200,25 +199,17 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle):
     # Diapositiva final de "Gracias"
     final_slide_layout = prs.slide_layouts[0]
     final_slide = prs.slides.add_slide(final_slide_layout)
-    if final_slide.shapes.title:
-        title_shape = final_slide.shapes.title
-        title_shape.text = "¡Gracias!"
-        title_shape.text_frame.paragraphs[0].font.size = Pt(72)
-        title_shape.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
-        slide_width = prs.slide_width
-        title_shape.left = round((slide_width - title_shape.width) / 2)
-        title_shape.top = round((prs.slide_height - title_shape.height) / 2)
-    else:
-        textbox = final_slide.shapes.add_textbox(Inches(1), Inches(1), Inches(8), Inches(2))
-        tf = textbox.text_frame
-        p = tf.paragraphs[0]
-        run = p.add_run()
-        run.text = "¡Gracias!"
-        run.font.size = Pt(72)
-        p.alignment = PP_ALIGN.CENTER
-        slide_width = prs.slide_width
-        textbox.left = round((slide_width - textbox.width) / 2)
-        textbox.top = round((prs.slide_height - textbox.height) / 2)
+    
+    left = top = Inches(0)
+    width = prs.slide_width
+    height = prs.slide_height
+
+    textbox = final_slide.shapes.add_textbox(left, top, width, height)
+    tf = textbox.text_frame
+    tf.text = "¡Gracias!"
+    tf.paragraphs[0].font.size = Pt(72)
+    tf.paragraphs[0].alignment = PP_ALIGN.CENTER
+    tf.vertical_anchor = pptx.enum.text.MSO_ANCHOR.MIDDLE
 
     logging.info("Presentación creada con éxito.")
     return prs
