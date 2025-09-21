@@ -27,7 +27,7 @@ def get_api_key(model_name):
     elif "gpt" in model_name:
         return st.secrets["OPENAI_API_KEY"]
     elif "gemini" in model_name:
-        return st.secrets["GOOGLE_API_KEY"]
+        return st.secrets["GEMINI_API_KEY"]
     return None
 
 def setup_openai_client(api_key):
