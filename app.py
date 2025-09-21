@@ -18,7 +18,6 @@ import openai
 # Configuración básica de registro
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-st.info("Iniciando la aplicación Streamlit...")
 
 # --- Configuración de la API ---
 def get_api_key(model_name):
@@ -35,14 +34,11 @@ def setup_openai_client(api_key):
 
 # --- Optimización de texto ---
 def optimize_text_for_ai(text_content):
-    logging.info("Optimizando texto de entrada...")
     optimized_text = re.sub(r'\s+', ' ', text_content).strip()
-    logging.info("Texto optimizado con éxito.")
     return optimized_text
 
 # --- Generación de slides con la IA seleccionada ---
 def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
-    logging.info(f"Generando esquema de diapositivas con {model_name}...")
     optimized_text = optimize_text_for_ai(text_content)
     try:
         headers = {
@@ -53,8 +49,7 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
         prompt = f"""
         A partir del siguiente texto, genera un esquema de presentación en formato JSON.
         El esquema debe tener un máximo de {num_slides} diapositivas.
-        Cada diapositiva debe tener las claves: "title", "bullets" (una lista de puntos clave), "narrative" (un párrafo detallado).
-        Además, para cada diapositiva, genera una clave "image_description" con una descripción precisa para crear una imagen.
+        Cada diapositiva debe tener las claves: "title", "bullets" (una lista de puntos clave), y "narrative" (un párrafo detallado).
         El texto a analizar es:
         "{optimized_text}"
         """
@@ -78,7 +73,7 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
             )
             ai_response_content = response.choices[0].message.content
         elif "gemini" in model_name:
-            api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent"
+            api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
             headers['x-goog-api-key'] = api_key
             payload = {
                 "contents": [{"parts": [{"text": prompt}]}]
@@ -90,18 +85,44 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
         json_start = ai_response_content.find('{')
         json_end = ai_response_content.rfind('}') + 1
         clean_json = ai_response_content[json_start:json_end]
-        logging.info("Esquema generado con éxito.")
         return json.loads(clean_json)
     except Exception as e:
         st.error(f"Error al procesar con la IA de texto: {e}")
-        logging.error(f"Error en generate_slides_data_with_ai: {e}")
+        return None
+
+# --- Generación de imágenes con IA ---
+def generate_image_with_ai(prompt, model_name, size, api_key):
+    if model_name == "DALL-E":
+        setup_openai_client(api_key)
+        try:
+            response = openai.images.generate(
+                model="dall-e-3",
+                prompt=prompt,
+                size=size,
+                quality="standard",
+                n=1
+            )
+            image_url = response.data[0].url
+            image_response = requests.get(image_url)
+            image_response.raise_for_status()
+            return Image.open(io.BytesIO(image_response.content))
+        except Exception as e:
+            st.error(f"Error al generar imagen con DALL-E: {e}")
+            return None
+    
+    # Placeholder de fallback
+    try:
+        image_path = "assets/images/placeholder.png"
+        return Image.open(image_path)
+    except FileNotFoundError:
+        st.error(f"Error: No se encontró el archivo de imagen en la ruta: {image_path}. Asegúrate de subirlo a tu repositorio.")
         return None
 
 # --- Funciones para crear presentación ---
-def create_presentation(slides_data, presentation_title, presentation_subtitle):
-    logging.info("Creando presentación PPTX con plantilla estándar.")
+def create_presentation(slides_data, presentation_title, presentation_subtitle, image_model, image_size, text_model_option):
     prs = Presentation()
     
+    # Diapositiva de título
     title_slide_layout = prs.slide_layouts[0]
     title_slide = prs.slides.add_slide(title_slide_layout)
     if title_slide.shapes.title is not None:
@@ -136,6 +157,8 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle):
 
     content_layout_index = 1
     
+    openai_api_key = get_api_key("gpt-3.5-turbo")
+    
     for slide_info in slides_data.get("slides", []):
         try:
             slide_layout = prs.slide_layouts[content_layout_index]
@@ -164,7 +187,30 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle):
                 for bullet in bullets:
                     p = tf.add_paragraph()
                     p.text = bullet
-        
+            
+            # Generación de la imagen con la IA seleccionada
+            image = None
+            if image_model == "DALL-E":
+                if openai_api_key:
+                    prompt_imagen = f"Imagen minimalista para presentación educativa sobre {slide_info.get('title', '')}"
+                    image = generate_image_with_ai(prompt_imagen, model_name=image_model, size=image_size, api_key=openai_api_key)
+                else:
+                    st.error("La clave de API de OpenAI no está configurada. No se pueden generar imágenes con DALL-E.")
+            else:
+                image = generate_image_with_ai(None, model_name="Placeholder", size=None, api_key=None)
+
+            if image:
+                img_stream = io.BytesIO()
+                image.save(img_stream, format='PNG')
+                img_stream.seek(0)
+                
+                left_inches = 14 / 2.54
+                top_inches = 7 / 2.54
+                width_inches = 10 / 2.54
+                height_inches = 11 / 2.54
+                
+                slide.shapes.add_picture(img_stream, Inches(left_inches), Inches(top_inches), width=Inches(width_inches), height=Inches(height_inches))
+
         except IndexError:
             st.error(f"Error: La plantilla no tiene el layout de diapositiva {content_layout_index}. Usando un layout predeterminado.")
             fallback_layout = prs.slide_layouts[1]
@@ -173,6 +219,7 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle):
             body_shape = slide.placeholders[1]
             body_shape.text = "\n".join(slide_info["bullets"])
     
+    # Diapositiva final de "Gracias"
     final_slide_layout = prs.slide_layouts[0]
     final_slide = prs.slides.add_slide(final_slide_layout)
     left = top = Inches(0)
@@ -185,22 +232,18 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle):
     tf.paragraphs[0].alignment = PP_ALIGN.CENTER
     tf.vertical_anchor = MSO_ANCHOR.MIDDLE
 
-    logging.info("Presentación creada con éxito.")
     return prs
 
 # --- Funciones para leer archivos ---
 def read_text_from_txt(uploaded_file):
-    logging.info("Leyendo archivo TXT...")
     return uploaded_file.read().decode("utf-8")
 def read_text_from_pdf(uploaded_file):
-    logging.info("Leyendo archivo PDF...")
     reader = PdfReader(uploaded_file)
     text = ""
     for page in reader.pages:
         text += page.extract_text()
     return text
 def read_text_from_docx(uploaded_file):
-    logging.info("Leyendo archivo DOCX...")
     doc = docx.Document(uploaded_file)
     text = ""
     for paragraph in doc.paragraphs:
@@ -214,6 +257,16 @@ st.markdown("Crea una presentación y su guion a partir de tu texto o archivo.")
 model_text_option = st.selectbox(
     "Elige la IA para generar el texto:",
     options=["deepseek-coder", "gpt-3.5-turbo", "gemini-1.5-pro"]
+)
+
+image_model_option = st.selectbox(
+    "Elige la IA para generar imágenes:",
+    options=["DALL-E", "Placeholder"]
+)
+
+image_size_option = st.selectbox(
+    "Elige la resolución de las imágenes (DALL-E):",
+    options=["1024x1024", "1792x1024", "1024x1792"]
 )
 
 presentation_title = st.text_input("Título de la presentación:", value="")
@@ -246,7 +299,6 @@ if 'presentation_data' not in st.session_state:
     st.session_state.narrative_data = None
 
 if st.button("Generar Presentación", disabled=is_button_disabled):
-    st.info("Botón 'Generar Presentación' presionado.")
     text_to_process = ""
     if uploaded_file is not None:
         file_extension = uploaded_file.name.split(".")[-1].lower()
@@ -261,9 +313,7 @@ if st.button("Generar Presentación", disabled=is_button_disabled):
     
     if not text_to_process:
         st.warning("Por favor, introduce un texto o sube un archivo para generar la presentación.")
-        logging.warning("No se proporcionó texto ni archivo.")
     else:
-        st.info("Iniciando el proceso de generación.")
         with st.spinner("Procesando texto y generando presentación..."):
             
             selected_ai_key = get_api_key(model_text_option)
@@ -273,9 +323,7 @@ if st.button("Generar Presentación", disabled=is_button_disabled):
             slides_data = generate_slides_data_with_ai(text_to_process, num_slides, model_text_option, selected_ai_key)
             
             if slides_data:
-                st.info("Datos de las diapositivas recibidos de la IA.")
-                
-                prs = create_presentation(slides_data, presentation_title, presentation_subtitle)
+                prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_size_option, image_model_option)
                 
                 pptx_file = BytesIO()
                 prs.save(pptx_file)
@@ -287,7 +335,6 @@ if st.button("Generar Presentación", disabled=is_button_disabled):
                     narrative_full_text += f"Diapositiva {i+1}: {slide['title']}\n\n"
                     narrative_full_text += f"{slide['narrative']}\n\n"
                     
-                    # Añadir la descripción de la imagen a la narrativa
                     if "image_description" in slide:
                         narrative_full_text += f"Descripción de la imagen: {slide['image_description']}\n\n"
                 
@@ -298,7 +345,6 @@ if st.button("Generar Presentación", disabled=is_button_disabled):
                 st.session_state.narrative_data = narrative_full_text.encode('utf-8')
                 
                 st.success("¡Presentación y narrativa generadas con éxito!")
-                logging.info("Proceso de generación finalizado con éxito.")
 
 if st.session_state.presentation_data is not None:
     with st.expander("📝 Narrativa y Referencias para el Presentador"):
