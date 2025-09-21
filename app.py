@@ -30,17 +30,14 @@ except Exception as e:
     st.error(f"Error inesperado al cargar la clave de API: {e}")
     st.stop()
 
-
-def get_template_files():
+def optimize_text_for_ai(text_content):
     """
-    Obtiene la lista de archivos de plantilla .pptx en la carpeta assets/templates.
+    Limpia y optimiza el texto de entrada para reducir el consumo de tokens.
     """
-    template_dir = "assets/templates"
-    if not os.path.exists(template_dir):
-        return []
-    
-    templates = [f for f in os.listdir(template_dir) if f.endswith('.pptx')]
-    return templates
+    logging.info("Optimizando texto de entrada...")
+    optimized_text = re.sub(r'\s+', ' ', text_content).strip()
+    logging.info("Texto optimizado con éxito.")
+    return optimized_text
 
 def generate_slides_data_with_ai(text_content, num_slides):
     """
