@@ -106,7 +106,12 @@ def create_presentation_from_template(slides_data, template_option):
         prs = Presentation()
     else:
         template_path = os.path.join("assets/templates", template_option)
-        prs = Presentation(template_path)
+        try:
+            prs = Presentation(template_path)
+        except Exception as e:
+            st.error(f"Error al cargar la plantilla personalizada: {e}. Usando una presentación estándar en su lugar.")
+            logging.error(f"Error al cargar la plantilla: {template_path}. Error: {e}")
+            prs = Presentation()
     
     title_slide_layout = prs.slide_layouts[0]
     title_slide = prs.slides.add_slide(title_slide_layout)
