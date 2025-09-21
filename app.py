@@ -15,6 +15,11 @@ import io
 import re
 import openai
 
+# Configuración básica de registro
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+st.info("Iniciando la aplicación Streamlit...")
+
 # --- Configuración de la API ---
 def get_api_key(model_name):
     if model_name == "deepseek-coder":
@@ -30,11 +35,14 @@ def setup_openai_client(api_key):
 
 # --- Optimización de texto ---
 def optimize_text_for_ai(text_content):
+    logging.info("Optimizando texto de entrada...")
     optimized_text = re.sub(r'\s+', ' ', text_content).strip()
+    logging.info("Texto optimizado con éxito.")
     return optimized_text
 
 # --- Generación de slides con la IA seleccionada ---
 def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
+    logging.info(f"Generando esquema de diapositivas con {model_name}...")
     optimized_text = optimize_text_for_ai(text_content)
     try:
         headers = {
@@ -260,6 +268,7 @@ num_slides = st.slider(
     max_value=15,
     value=5
 )
+
 st.header("⚙️ Entrada de Contenido")
 uploaded_file = st.file_uploader(
     "Sube un archivo (.txt, .docx, .pdf)",
