@@ -26,7 +26,6 @@ def generate_slides_data_with_ai(text_content):
             'Content-Type': 'application/json',
             'Authorization': f'Bearer {api_key}'
         }
-        # PROMPT ACTUALIZADO para incluir narrativa y referencias
         prompt = f"""
         A partir del siguiente texto, genera un esquema de presentación en formato JSON.
         El esquema debe tener una estructura de un objeto con las claves: "slides" y "references".
@@ -68,26 +67,4 @@ def generate_image_with_dalle(prompt):
             "n": 1,
             "size": "1024x1024"
         }
-        response = requests.post("https://api.openai.com/v1/images/generations", headers=headers, json=payload)
-        response.raise_for_status()
-        image_url = response.json()["data"][0]["url"]
-        image_response = requests.get(image_url)
-        image_response.raise_for_status()
-        return Image.open(io.BytesIO(image_response.content))
-    except Exception as e:
-        st.error(f"Error al generar imagen con DALL·E: {e}")
-        return None
-
-def create_presentation(slides_data):
-    """
-    Crea una presentación de PowerPoint con contenido e imágenes.
-    """
-    prs = Presentation()
-    title_slide_layout = prs.slide_layouts[0]
-    slide = prs.slides.add_slide(title_slide_layout)
-    title = slide.shapes.title
-    title.text = "Presentación Generada por IA"
-    
-    for slide_info in slides_data.get("slides", []):
-        slide_layout = prs.slide_layouts[5] # Plantilla con imagen
-        slide = prs.slides.add_slide(slide
+        response = requests
