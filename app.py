@@ -10,7 +10,6 @@ from PIL import Image
 import io
 import docx
 from pypdf import PdfReader
-import google.generativeai as genai
 
 # Configuración básica de registro
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -18,28 +17,27 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 st.info("Iniciando la aplicación Streamlit...")
 
 # --- Configuración de la API ---
+# Usa st.secrets para las claves
 try:
     deepseek_api_key = st.secrets["DEEPSEEK_API_KEY"]
-    google_api_key = st.secrets["GOOGLE_API_KEY"]
-    genai.configure(api_key=google_api_key)
-    st.info("Claves de API cargadas con éxito.")
+    st.info("Clave de API de DeepSeek cargada con éxito.")
 except KeyError as e:
     st.error(f"Error: La clave de API '{e.args[0]}' no se encontró en Streamlit Secrets. Por favor, configura tus claves.")
     st.stop()
 except Exception as e:
-    st.error(f"Error inesperado al configurar la API de Google: {e}")
+    st.error(f"Error inesperado al cargar la clave de API: {e}")
     st.stop()
 
-def optimize_text_for_ai(text_content):
+def get_template_files():
     """
-    Limpia y optimiza el texto de entrada para reducir el consumo de tokens.
+    Obtiene la lista de archivos de plantilla .pptx en la carpeta assets/templates.
     """
-    logging.info("Optimizando texto de entrada...")
-    # Eliminar espacios múltiples y saltos de línea innecesarios
-    optimized_text = " ".join(text_content.split())
-    # Opcionalmente, podrías añadir más lógica de limpieza o resúmenes aquí.
-    logging.info("Texto optimizado con éxito.")
-    return optimized_text
+    template_dir = "assets/templates"
+    if not os.path.exists(template_dir):
+        return []
+    
+    templates = [f for f in os.listdir(template_dir) if f.endswith('.pptx')]
+    return templates
 
 def generate_slides_data_with_ai(text_content, num_slides):
     """
@@ -47,22 +45,19 @@ def generate_slides_data_with_ai(text_content, num_slides):
     incluyendo títulos, bullets, narrativa y referencias.
     """
     logging.info("Generando esquema de diapositivas con DeepSeek...")
-    optimized_text = optimize_text_for_ai(text_content)
     try:
         headers = {
             'Content-Type': 'application/json',
             'Authorization': f'Bearer {deepseek_api_key}'
         }
-        # PROMPT MEJORADO para solicitar narrativa más extensa
         prompt = f"""
         A partir del siguiente texto, genera un esquema de presentación en formato JSON.
-        La narrativa debe ser un desarrollo extenso y detallado, de al menos 200 palabras por diapositiva.
         El esquema debe tener un máximo de {num_slides} diapositivas.
         El esquema debe tener una estructura de un objeto con las claves: "slides" y "references".
         - "slides" debe ser un array de objetos. Cada objeto debe tener las claves: "title" (título de la diapositiva), "bullets" (una lista de puntos clave), y "narrative" (un párrafo detallado para que un presentador lo lea).
         - "references" debe ser una lista de cadenas de texto con las referencias bibliográficas que encuentres en el texto de entrada. Si no hay, la lista debe estar vacía.
         El texto a analizar es:
-        "{optimized_text}"
+        "{text_content}"
         """
         payload = {
             "model": "deepseek-coder",
@@ -107,26 +102,16 @@ def create_presentation_from_template(slides_data, template_option):
     """
     logging.info(f"Creando presentación PPTX con la opción: {template_option}")
     
-    if template_option == "Utilizar mi plantilla personalizada":
-        template_path = "assets/templates/UNRC_presentacion.pptx"
-        if not os.path.exists(template_path):
-            st.warning("No se encontró la plantilla personalizada. Creando una presentación estándar en su lugar.")
-            prs = Presentation()
-        else:
-            prs = Presentation(template_path)
-    else:
+    if template_option == "Plantilla estándar de Python":
         prs = Presentation()
-    
-    if template_option == "Salida estándar (solo contenido)":
-        title_slide_layout = prs.slide_layouts[0]
-        title_slide = prs.slides.add_slide(title_slide_layout)
-        title_slide.shapes.title.text = "Presentación Generada por IA"
-        content_layout_index = 1
     else:
-        title_slide_layout = prs.slide_layouts[0]
-        title_slide = prs.slides.add_slide(title_slide_layout)
-        title_slide.shapes.title.text = "Presentación Generada por IA"
-        content_layout_index = 1
+        template_path = os.path.join("assets/templates", template_option)
+        prs = Presentation(template_path)
+    
+    title_slide_layout = prs.slide_layouts[0]
+    title_slide = prs.slides.add_slide(title_slide_layout)
+    title_slide.shapes.title.text = "Presentación Generada por IA"
+    content_layout_index = 1
     
     placeholder_image = get_placeholder_image()
 
@@ -196,13 +181,11 @@ num_slides = st.slider(
     value=5
 )
 
+template_files = get_template_files()
+template_options = ["Plantilla estándar de Python"] + template_files
 template_option = st.selectbox(
     "Elige una opción de plantilla:",
-    options=[
-        "Utilizar plantilla estándar (Python PPTX)",
-        "Utilizar mi plantilla personalizada",
-        "Salida estándar (solo contenido)"
-    ]
+    options=template_options
 )
 
 uploaded_file = st.file_uploader(
