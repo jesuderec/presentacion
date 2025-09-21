@@ -89,11 +89,9 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
         json_start = ai_response_content.find('{')
         json_end = ai_response_content.rfind('}') + 1
         clean_json = ai_response_content[json_start:json_end]
-        logging.info("Esquema generado con éxito.")
         return json.loads(clean_json)
     except Exception as e:
         st.error(f"Error al procesar con la IA de texto: {e}")
-        logging.error(f"Error en generate_slides_data_with_ai: {e}")
         return None
 
 # --- Generación de imágenes con IA ---
