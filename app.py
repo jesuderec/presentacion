@@ -18,6 +18,7 @@ import openai
 # Configuración básica de registro
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+st.info("Iniciando la aplicación Streamlit...")
 
 # --- Configuración de la API ---
 def get_api_key(model_name):
@@ -34,11 +35,14 @@ def setup_openai_client(api_key):
 
 # --- Optimización de texto ---
 def optimize_text_for_ai(text_content):
+    logging.info("Optimizando texto de entrada...")
     optimized_text = re.sub(r'\s+', ' ', text_content).strip()
+    logging.info("Texto optimizado con éxito.")
     return optimized_text
 
 # --- Generación de slides con la IA seleccionada ---
 def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
+    logging.info(f"Generando esquema de diapositivas con {model_name}...")
     optimized_text = optimize_text_for_ai(text_content)
     try:
         headers = {
@@ -85,9 +89,11 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
         json_start = ai_response_content.find('{')
         json_end = ai_response_content.rfind('}') + 1
         clean_json = ai_response_content[json_start:json_end]
+        logging.info("Esquema generado con éxito.")
         return json.loads(clean_json)
     except Exception as e:
         st.error(f"Error al procesar con la IA de texto: {e}")
+        logging.error(f"Error en generate_slides_data_with_ai: {e}")
         return None
 
 # --- Generación de imágenes con IA ---
@@ -188,7 +194,6 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                     p = tf.add_paragraph()
                     p.text = bullet
             
-            # Generación de la imagen con la IA seleccionada
             image = None
             if image_model == "DALL-E":
                 if openai_api_key:
@@ -251,57 +256,50 @@ def read_text_from_docx(uploaded_file):
     return text
 
 # --- Interfaz de Streamlit ---
-
-# Título principal de la aplicación en el área principal
 st.title("Generador de Presentaciones 🤖✨🖼️")
 st.markdown("Crea una presentación y su guion a partir de tu texto o archivo.")
+st.markdown("---")
 
-# --- Sidebar para configuraciones ---
-st.sidebar.header("⚙️ Configuración")
-
-uploaded_file = st.sidebar.file_uploader(
-    "Sube un archivo (.txt, .docx, .pdf)",
-    type=["txt", "docx", "pdf"]
-)
-st.sidebar.markdown("---")
-st.sidebar.write("O pega tu texto directamente aquí:")
-text_input = st.sidebar.text_area(
-    "Pega tu texto aquí",
-    height=200,
-    placeholder="Ej. El ciclo del agua es el proceso de...\n..."
-)
-
-st.sidebar.markdown("---")
-st.sidebar.header("🤖 Modelos de IA")
-model_text_option = st.sidebar.selectbox(
-    "Elige la IA para generar el texto:",
-    options=["deepseek-coder", "gpt-3.5-turbo", "gemini-1.5-pro"]
-)
-
-st.sidebar.markdown("---")
-st.sidebar.header("🖼️ Opciones de Imagen (DALL-E)")
-image_model_option = st.sidebar.selectbox(
-    "Elige la IA para generar imágenes:",
-    options=["DALL-E", "Placeholder"]
-)
-
-image_size_option = st.sidebar.selectbox(
-    "Elige la resolución de las imágenes (DALL-E):",
-    options=["1024x1024", "1792x1024", "1024x1792"]
-)
-
-st.sidebar.markdown("---")
-st.sidebar.header("📄 Detalles de la Presentación")
-presentation_title = st.sidebar.text_input("Título de la presentación:", value="")
-presentation_subtitle = st.sidebar.text_input("Subtítulo (opcional):", value="")
-num_slides = st.sidebar.slider(
+st.header("📄 Detalles de la Presentación")
+presentation_title = st.text_input("Título de la presentación:", value="")
+presentation_subtitle = st.text_input("Subtítulo (opcional):", value="")
+num_slides = st.slider(
     "Número de diapositivas (excluyendo la portada):",
     min_value=3,
     max_value=10,
     value=5
 )
 
-# --- Lógica principal de la aplicación ---
+st.header("⚙️ Entrada de Contenido")
+uploaded_file = st.file_uploader(
+    "Sube un archivo (.txt, .docx, .pdf)",
+    type=["txt", "docx", "pdf"]
+)
+st.markdown("---")
+st.markdown("O pega tu texto directamente aquí:")
+text_input = st.text_area(
+    "Pega tu texto aquí",
+    height=200,
+    placeholder="Ej. El ciclo del agua es el proceso de...\n..."
+)
+
+st.header("🤖 Modelos de IA")
+model_text_option = st.selectbox(
+    "Elige la IA para generar el texto:",
+    options=["deepseek-coder", "gpt-3.5-turbo", "gemini-1.5-pro"]
+)
+
+st.header("🖼️ Opciones de Imagen (DALL-E)")
+image_model_option = st.selectbox(
+    "Elige la IA para generar imágenes:",
+    options=["DALL-E", "Placeholder"]
+)
+
+image_size_option = st.selectbox(
+    "Elige la resolución de las imágenes (DALL-E):",
+    options=["1024x1024", "1792x1024", "1024x1792"]
+)
+
 is_title_provided = bool(presentation_title.strip())
 is_content_provided = (uploaded_file is not None) or (bool(text_input.strip()))
 is_button_disabled = not (is_title_provided and is_content_provided)
