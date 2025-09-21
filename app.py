@@ -251,45 +251,57 @@ def read_text_from_docx(uploaded_file):
     return text
 
 # --- Interfaz de Streamlit ---
+
+# Título principal de la aplicación en el área principal
 st.title("Generador de Presentaciones 🤖✨🖼️")
 st.markdown("Crea una presentación y su guion a partir de tu texto o archivo.")
 
-model_text_option = st.selectbox(
+# --- Sidebar para configuraciones ---
+st.sidebar.header("⚙️ Configuración")
+
+uploaded_file = st.sidebar.file_uploader(
+    "Sube un archivo (.txt, .docx, .pdf)",
+    type=["txt", "docx", "pdf"]
+)
+st.sidebar.markdown("---")
+st.sidebar.write("O pega tu texto directamente aquí:")
+text_input = st.sidebar.text_area(
+    "Pega tu texto aquí",
+    height=200,
+    placeholder="Ej. El ciclo del agua es el proceso de...\n..."
+)
+
+st.sidebar.markdown("---")
+st.sidebar.header("🤖 Modelos de IA")
+model_text_option = st.sidebar.selectbox(
     "Elige la IA para generar el texto:",
     options=["deepseek-coder", "gpt-3.5-turbo", "gemini-1.5-pro"]
 )
 
-image_model_option = st.selectbox(
+st.sidebar.markdown("---")
+st.sidebar.header("🖼️ Opciones de Imagen (DALL-E)")
+image_model_option = st.sidebar.selectbox(
     "Elige la IA para generar imágenes:",
     options=["DALL-E", "Placeholder"]
 )
 
-image_size_option = st.selectbox(
+image_size_option = st.sidebar.selectbox(
     "Elige la resolución de las imágenes (DALL-E):",
     options=["1024x1024", "1792x1024", "1024x1792"]
 )
 
-presentation_title = st.text_input("Título de la presentación:", value="")
-presentation_subtitle = st.text_input("Subtítulo (opcional):", value="")
-num_slides = st.slider(
+st.sidebar.markdown("---")
+st.sidebar.header("📄 Detalles de la Presentación")
+presentation_title = st.sidebar.text_input("Título de la presentación:", value="")
+presentation_subtitle = st.sidebar.text_input("Subtítulo (opcional):", value="")
+num_slides = st.sidebar.slider(
     "Número de diapositivas (excluyendo la portada):",
     min_value=3,
     max_value=10,
     value=5
 )
 
-uploaded_file = st.file_uploader(
-    "Sube un archivo (.txt, .docx, .pdf)",
-    type=["txt", "docx", "pdf"]
-)
-st.markdown("---")
-st.markdown("O pega tu texto directamente aquí:")
-text_input = st.text_area(
-    "Pega tu texto aquí",
-    height=200,
-    placeholder="Ej. El ciclo del agua es el proceso de...\n..."
-)
-
+# --- Lógica principal de la aplicación ---
 is_title_provided = bool(presentation_title.strip())
 is_content_provided = (uploaded_file is not None) or (bool(text_input.strip()))
 is_button_disabled = not (is_title_provided and is_content_provided)
@@ -323,7 +335,7 @@ if st.button("Generar Presentación", disabled=is_button_disabled):
             slides_data = generate_slides_data_with_ai(text_to_process, num_slides, model_text_option, selected_ai_key)
             
             if slides_data:
-                prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_size_option, image_model_option)
+                prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_model_option, image_size_option, model_text_option)
                 
                 pptx_file = BytesIO()
                 prs.save(pptx_file)
