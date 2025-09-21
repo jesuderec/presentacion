@@ -10,7 +10,7 @@ from PIL import Image
 import io
 import docx
 from pypdf import PdfReader
-# Removida la importación de google.generativeai
+import google.generativeai as genai
 
 # Configuración básica de registro
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -21,13 +21,14 @@ st.info("Iniciando la aplicación Streamlit...")
 # Usa st.secrets para las claves
 try:
     deepseek_api_key = st.secrets["DEEPSEEK_API_KEY"]
-    # Removida la configuración de la API de Google
-    st.info("Clave de API de DeepSeek cargada con éxito.")
+    google_api_key = st.secrets["GOOGLE_API_KEY"]
+    genai.configure(api_key=google_api_key)
+    st.info("Claves de API cargadas con éxito.")
 except KeyError as e:
     st.error(f"Error: La clave de API '{e.args[0]}' no se encontró en Streamlit Secrets. Por favor, configura tus claves.")
     st.stop()
 except Exception as e:
-    st.error(f"Error inesperado al cargar la clave de API: {e}")
+    st.error(f"Error inesperado al configurar la API de Google: {e}")
     st.stop()
 
 def generate_slides_data_with_ai(text_content, num_slides):
@@ -69,28 +70,42 @@ def generate_slides_data_with_ai(text_content, num_slides):
         logging.error(f"Error en generate_slides_data_with_ai: {e}")
         return None
 
-def get_placeholder_image():
+def generate_image_with_gemini_ecosystem(prompt):
     """
-    Obtiene la imagen de placeholder para la presentación.
+    Genera una imagen usando la API de Google AI Studio (Gemini Ecosystem).
     """
-    logging.info("Cargando imagen de placeholder...")
+    logging.info("Generando imagen con Gemini ecosistema...")
     try:
-        # La ruta del archivo es relativa a la raíz del repositorio
-        image_path = "assets/images/placeholder.png"
-        return Image.open(image_path)
-    except FileNotFoundError:
-        st.error(f"Error: No se encontró el archivo de imagen en la ruta: {image_path}")
-        logging.error("No se encontró el archivo de imagen de placeholder.")
-        return None
-    except Exception as e:
-        st.error(f"Error al cargar la imagen de placeholder: {e}")
-        logging.error(f"Error al cargar la imagen: {e}")
-        return None
+        model = genai.GenerativeModel('gemini-pro')
+        response = model.generate_content(f"Genera una descripción muy breve y un URL de imagen de stock para '{prompt}'. Ejemplo: 'Imagen de un paisaje. https://example.com/paisaje.jpg'")
+        
+        text_response = response.text
+        if "http" in text_response:
+            url_start = text_response.find("http")
+            url_end = text_response.find(" ", url_start) if " " in text_response[url_start:] else len(text_response)
+            image_url = text_response[url_start:url_end].strip()
+            
+            if image_url and (image_url.startswith("http") and ("example.com" not in image_url)):
+                st.info(f"Usando URL generada por Gemini: {image_url}")
+                logging.info(f"URL de imagen generada: {image_url}")
+                image_response = requests.get(image_url)
+                image_response.raise_for_status()
+                return Image.open(io.BytesIO(image_response.content))
+            else:
+                st.warning("No se pudo obtener una URL de imagen real de Gemini, usando imagen de placeholder.")
+                return Image.open("assets/images/placeholder.png")
+        else:
+            st.warning("Gemini no proporcionó una URL. Usando imagen de placeholder.")
+            return Image.open("assets/images/placeholder.png")
 
+    except Exception as e:
+        st.error(f"Error al generar imagen con Gemini (o al simularla): {e}")
+        logging.error(f"Error en generate_image_with_gemini_ecosystem: {e}")
+        return Image.open("assets/images/placeholder.png")
 
 def create_presentation(slides_data):
     """
-    Crea una presentación de PowerPoint con contenido e imágenes de placeholder.
+    Crea una presentación de PowerPoint con contenido e imágenes.
     """
     logging.info("Creando presentación PPTX...")
     prs = Presentation()
@@ -98,8 +113,6 @@ def create_presentation(slides_data):
     slide = prs.slides.add_slide(title_slide_layout)
     title = slide.shapes.title
     title.text = "Presentación Generada por IA"
-    
-    placeholder_image = get_placeholder_image()
     
     for slide_info in slides_data.get("slides", []):
         slide_layout = prs.slide_layouts[1]
@@ -111,9 +124,12 @@ def create_presentation(slides_data):
         content_text = "\n".join(slide_info["bullets"])
         body_shape.text = content_text
         
-        if placeholder_image:
+        prompt_imagen = f"Imagen minimalista para presentación educativa sobre {slide_info['title']}"
+        image = generate_image_with_gemini_ecosystem(prompt_imagen)
+        
+        if image:
             img_stream = io.BytesIO()
-            placeholder_image.save(img_stream, format='PNG')
+            image.save(img_stream, format='PNG')
             img_stream.seek(0)
             
             left = Inches(6)
@@ -172,6 +188,12 @@ text_input = st.text_area(
     placeholder="Ej. El ciclo del agua es el proceso de...\n..."
 )
 
+# Inicializar st.session_state
+if 'presentation_data' not in st.session_state:
+    st.session_state.presentation_data = None
+    st.session_state.narrative_data = None
+
+
 if st.button("Generar Presentación"):
     st.info("Botón 'Generar Presentación' presionado.")
     text_to_process = ""
@@ -199,51 +221,47 @@ if st.button("Generar Presentación"):
             
             if slides_data:
                 st.info("Datos de las diapositivas recibidos de la IA.")
-                with st.expander("📝 Narrativa y Referencias para el Presentador"):
-                    for i, slide in enumerate(slides_data.get("slides", [])):
-                        st.subheader(f"Diapositiva {i+1}: {slide['title']}")
-                        st.write(slide["narrative"])
-                        st.write("---")
-                    
-                    if slides_data.get("references"):
-                        st.subheader("📚 Referencias Bibliográficas")
-                        for ref in slides_data["references"]:
-                            st.write(f"- {ref}")
-                    else:
-                        st.info("No se encontraron referencias bibliográficas en el texto.")
-
-                narrative_full_text = ""
-                for i, slide in enumerate(slides_data.get("slides", [])):
-                    narrative_full_text += f"Diapositiva {i+1}: {slide['title']}\n\n"
-                    narrative_full_text += f"{slide['narrative']}\n\n"
-                    
-                if slides_data.get("references"):
-                    narrative_full_text += "Referencias Bibliográficas:\n"
-                    for ref in slides_data["references"]:
-                        narrative_full_text += f"- {ref}\n"
-
-                col1, col2 = st.columns(2)
-
+                
+                # Generar la presentación y guardar en el estado de la sesión
                 prs = create_presentation(slides_data)
                 pptx_file = BytesIO()
                 prs.save(pptx_file)
                 pptx_file.seek(0)
+                st.session_state.presentation_data = pptx_file
                 
-                with col1:
-                    st.download_button(
-                        label="Descargar presentación (.pptx)",
-                        data=pptx_file,
-                        file_name="presentacion_ia_con_narrativa.pptx",
-                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
-                    )
-
-                with col2:
-                    st.download_button(
-                        label="Descargar narrativa (.txt)",
-                        data=narrative_full_text.encode('utf-8'),
-                        file_name="narrativa_presentacion.txt",
-                        mime="text/plain"
-                    )
-
+                # Generar la narrativa y guardarla en el estado de la sesión
+                narrative_full_text = ""
+                for i, slide in enumerate(slides_data.get("slides", [])):
+                    narrative_full_text += f"Diapositiva {i+1}: {slide['title']}\n\n"
+                    narrative_full_text += f"{slide['narrative']}\n\n"
+                
+                if slides_data.get("references"):
+                    narrative_full_text += "Referencias Bibliográficas:\n"
+                    for ref in slides_data["references"]:
+                        narrative_full_text += f"- {ref}\n"
+                st.session_state.narrative_data = narrative_full_text.encode('utf-8')
+                
                 st.success("¡Presentación y narrativa generadas con éxito!")
                 logging.info("Proceso de generación finalizado con éxito.")
+
+# Mostrar los botones de descarga si los datos existen en el estado de la sesión
+if st.session_state.presentation_data is not None:
+    with st.expander("📝 Narrativa y Referencias para el Presentador"):
+        # Se muestra la narrativa desde el estado de la sesión
+        st.write(st.session_state.narrative_data.decode('utf-8'))
+        
+    col1, col2 = st.columns(2)
+    with col1:
+        st.download_button(
+            label="Descargar presentación (.pptx)",
+            data=st.session_state.presentation_data,
+            file_name="presentacion_ia_con_narrativa.pptx",
+            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        )
+    with col2:
+        st.download_button(
+            label="Descargar narrativa (.txt)",
+            data=st.session_state.narrative_data,
+            file_name="narrativa_presentacion.txt",
+            mime="text/plain"
+        )
