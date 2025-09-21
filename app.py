@@ -77,7 +77,7 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
             )
             ai_response_content = response.choices[0].message.content
         elif "gemini" in model_name:
-            api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
+            api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent"
             headers['x-goog-api-key'] = api_key
             payload = {
                 "contents": [{"parts": [{"text": prompt}]}]
@@ -251,7 +251,7 @@ st.markdown("Crea una presentación y su guion a partir de tu texto o archivo.")
 
 model_text_option = st.selectbox(
     "Elige la IA para generar el texto:",
-    options=["deepseek-coder", "gpt-3.5-turbo", "gemini-pro"]
+    options=["deepseek-coder", "gpt-3.5-turbo", "gemini-1.5-pro"]
 )
 
 image_size_option = st.selectbox(
