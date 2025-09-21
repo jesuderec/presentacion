@@ -266,7 +266,7 @@ presentation_subtitle = st.text_input("Subtítulo (opcional):", value="")
 num_slides = st.slider(
     "Número de diapositivas (excluyendo la portada):",
     min_value=3,
-    max_value=10,
+    max_value=15,
     value=5
 )
 
@@ -286,7 +286,7 @@ text_input = st.text_area(
 st.header("🤖 Modelos de IA")
 model_text_option = st.selectbox(
     "Elige la IA para generar el texto:",
-    options=["deepseek-coder", "gpt-3.5-turbo", "gemini-1.5-pro"]
+    options=["deepseek-coder", "gpt-3.5-turbo", "gemini-2.0-flash"]
 )
 
 st.header("🖼️ Opciones de Imagen (DALL-E)")
@@ -333,7 +333,7 @@ if st.button("Generar Presentación", disabled=is_button_disabled):
             slides_data = generate_slides_data_with_ai(text_to_process, num_slides, model_text_option, selected_ai_key)
             
             if slides_data:
-                prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_model_option, image_size_option, model_text_option)
+                prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_size_option, image_model_option, model_text_option)
                 
                 pptx_file = BytesIO()
                 prs.save(pptx_file)
