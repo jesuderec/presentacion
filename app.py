@@ -2,6 +2,7 @@ import streamlit as st
 import logging
 from pptx import Presentation
 from pptx.util import Inches, Pt
+from pptx.enum.text import PP_ALIGN
 from io import BytesIO
 import requests
 import json
@@ -192,8 +193,12 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle):
         title_shape = final_slide.shapes.title
         title_shape.text = "¡Gracias!"
         title_shape.text_frame.paragraphs[0].font.size = Pt(72)
-        title_shape.left = Inches(19 / 2.54)
-        title_shape.top = Inches(16 / 2.54)
+        # Centrar el texto en el placeholder
+        title_shape.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+        # Recalcular la posición para centrar el placeholder
+        slide_width = prs.slide_width
+        title_shape.left = (slide_width - title_shape.width) / 2
+        title_shape.top = (prs.slide_height - title_shape.height) / 2
     else:
         textbox = final_slide.shapes.add_textbox(Inches(19 / 2.54), Inches(16 / 2.54), Inches(5.5 / 2.54), Inches(7.3 / 2.54))
         tf = textbox.text_frame
@@ -201,6 +206,12 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle):
         run = p.add_run()
         run.text = "¡Gracias!"
         run.font.size = Pt(72)
+        # Centrar el texto en el textbox
+        p.alignment = PP_ALIGN.CENTER
+        # Recalcular la posición para centrar el textbox
+        slide_width = prs.slide_width
+        textbox.left = (slide_width - textbox.width) / 2
+        textbox.top = (prs.slide_height - textbox.height) / 2
 
     logging.info("Presentación creada con éxito.")
     return prs
@@ -254,10 +265,10 @@ text_input = st.text_area(
     placeholder="Ej. El ciclo del agua es el proceso de...\n..."
 )
 
-# Lógica de validación
 is_title_provided = bool(presentation_title.strip())
 is_content_provided = (uploaded_file is not None) or (bool(text_input.strip()))
 is_button_disabled = not (is_title_provided and is_content_provided)
+
 
 if 'presentation_data' not in st.session_state:
     st.session_state.presentation_data = None
