@@ -3,7 +3,7 @@ import logging
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.enum.text import PP_ALIGN
-import pptx.enum.text
+from pptx.enum.text import MSO_ANCHOR
 from io import BytesIO
 import requests
 import json
@@ -119,7 +119,7 @@ def generate_image_with_dalle(prompt, size, api_key):
         return None
 
 # --- Funciones para crear presentación ---
-def create_presentation(slides_data, presentation_title, presentation_subtitle, image_size):
+def create_presentation(slides_data, presentation_title, presentation_subtitle, image_size, model_text_option):
     logging.info("Creando presentación PPTX con plantilla estándar.")
     prs = Presentation()
     
@@ -222,7 +222,7 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
     tf.text = "¡Gracias!"
     tf.paragraphs[0].font.size = Pt(72)
     tf.paragraphs[0].alignment = PP_ALIGN.CENTER
-    tf.vertical_anchor = pptx.enum.text.MSO_ANCHOR.MIDDLE
+    tf.vertical_anchor = MSO_ANCHOR.MIDDLE
 
     logging.info("Presentación creada con éxito.")
     return prs
@@ -319,7 +319,7 @@ if st.button("Generar Presentación", disabled=is_button_disabled):
             if slides_data:
                 st.info("Datos de las diapositivas recibidos de la IA.")
                 
-                prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_size_option)
+                prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_size_option, model_text_option)
                 
                 pptx_file = BytesIO()
                 prs.save(pptx_file)
