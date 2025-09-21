@@ -50,7 +50,6 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
             'Authorization': f'Bearer {api_key}'
         }
         
-        # El prompt se mantiene genérico para ser compatible con varios modelos
         prompt = f"""
         A partir del siguiente texto, genera un esquema de presentación en formato JSON.
         El esquema debe tener un máximo de {num_slides} diapositivas.
@@ -59,7 +58,6 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
         "{optimized_text}"
         """
         
-        # Lógica para diferentes APIs
         if "deepseek" in model_name:
             api_url = "https://api.deepseek.com/v1/chat/completions"
             payload = {
@@ -72,7 +70,6 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
             response.raise_for_status()
             ai_response_content = response.json()["choices"][0]["message"]["content"]
         elif "gpt" in model_name:
-            api_url = "https://api.openai.com/v1/chat/completions"
             setup_openai_client(api_key)
             response = openai.chat.completions.create(
                 model=model_name,
@@ -80,7 +77,6 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
             )
             ai_response_content = response.choices[0].message.content
         elif "gemini" in model_name:
-            # Reimplementación de Gemini de forma segura
             api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
             headers['x-goog-api-key'] = api_key
             payload = {
@@ -90,7 +86,6 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
             response.raise_for_status()
             ai_response_content = response.json()["candidates"][0]["content"]["parts"][0]["text"]
         
-        # Limpiar JSON y devolver
         json_start = ai_response_content.find('{')
         json_end = ai_response_content.rfind('}') + 1
         clean_json = ai_response_content[json_start:json_end]
@@ -122,12 +117,12 @@ def generate_image_with_dalle(prompt, size, api_key):
         st.error(f"Error al generar imagen con DALL-E: {e}")
         logging.error(f"Error en generate_image_with_dalle: {e}")
         return None
+
 # --- Funciones para crear presentación ---
 def create_presentation(slides_data, presentation_title, presentation_subtitle, image_size):
     logging.info("Creando presentación PPTX con plantilla estándar.")
     prs = Presentation()
     
-    # Manejo de la diapositiva de título
     title_slide_layout = prs.slide_layouts[0]
     title_slide = prs.slides.add_slide(title_slide_layout)
     if title_slide.shapes.title is not None:
@@ -194,7 +189,6 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                     p = tf.add_paragraph()
                     p.text = bullet
             
-            # Generación de la imagen con DALL-E
             if openai_api_key:
                 prompt_imagen = f"Imagen minimalista para presentación educativa sobre {slide_info.get('title', '')}"
                 image = generate_image_with_dalle(prompt_imagen, size=image_size, api_key=openai_api_key)
@@ -316,7 +310,6 @@ if st.button("Generar Presentación", disabled=is_button_disabled):
         st.info("Iniciando el proceso de generación.")
         with st.spinner("Procesando texto y generando presentación..."):
             
-            # Generación de slides de texto con la IA elegida
             selected_ai_key = get_api_key(model_text_option)
             if not selected_ai_key:
                 st.error("No se encontró la clave de API para el modelo seleccionado. Por favor, configura tus secretos.")
@@ -326,7 +319,6 @@ if st.button("Generar Presentación", disabled=is_button_disabled):
             if slides_data:
                 st.info("Datos de las diapositivas recibidos de la IA.")
                 
-                # Creación de la presentación
                 prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_size_option)
                 
                 pptx_file = BytesIO()
