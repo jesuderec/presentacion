@@ -157,7 +157,6 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
 
     content_layout_index = 1
     
-    # Obtener clave de la API de OpenAI para DALL-E
     openai_api_key = get_api_key("gpt-3.5-turbo")
     
     for slide_info in slides_data.get("slides", []):
