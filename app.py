@@ -321,40 +321,4 @@ if st.button("Generar Presentación", disabled=is_button_disabled):
                 prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_size_option, model_text_option)
                 
                 pptx_file = BytesIO()
-                prs.save(pptx_file)
-                pptx_file.seek(0)
-                st.session_state.presentation_data = pptx_file
-                
-                narrative_full_text = ""
-                for i, slide in enumerate(slides_data.get("slides", [])):
-                    narrative_full_text += f"Diapositiva {i+1}: {slide['title']}\n\n"
-                    narrative_full_text += f"{slide['narrative']}\n\n"
-                
-                if slides_data.get("references"):
-                    narrative_full_text += "Referencias Bibliográficas:\n"
-                    for ref in slides_data["references"]:
-                        narrative_full_text += f"- {ref}\n"
-                st.session_state.narrative_data = narrative_full_text.encode('utf-8')
-                
-                st.success("¡Presentación y narrativa generadas con éxito!")
-                logging.info("Proceso de generación finalizado con éxito.")
-
-if st.session_state.presentation_data is not None:
-    with st.expander("📝 Narrativa y Referencias para el Presentador"):
-        st.write(st.session_state.narrative_data.decode('utf-8'))
-        
-    col1, col2 = st.columns(2)
-    with col1:
-        st.download_button(
-            label="Descargar presentación (.pptx)",
-            data=st.session_state.presentation_data,
-            file_name="presentacion_ia_con_narrativa.pptx",
-            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
-        )
-    with col2:
-        st.download_button(
-            label="Descargar narrativa (.txt)",
-            data=st.session_state.narrative_data,
-            file_name="narrativa_presentacion.txt",
-            mime="text/plain"
-        )
+                prs.save(pptx_file
