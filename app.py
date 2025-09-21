@@ -231,7 +231,7 @@ def read_text_from_docx(uploaded_file):
 st.title("Generador de Presentaciones 🤖✨🖼️")
 st.markdown("Crea una presentación y su guion a partir de tu texto o archivo.")
 
-presentation_title = st.text_input("Título de la presentación:", value="Presentación Generada por IA")
+presentation_title = st.text_input("Título de la presentación:", value="")
 presentation_subtitle = st.text_input("Subtítulo (opcional):", value="")
 
 num_slides = st.slider(
@@ -254,12 +254,17 @@ text_input = st.text_area(
     placeholder="Ej. El ciclo del agua es el proceso de...\n..."
 )
 
+# Lógica de validación
+is_title_provided = bool(presentation_title.strip())
+is_content_provided = (uploaded_file is not None) or (bool(text_input.strip()))
+is_button_disabled = not (is_title_provided and is_content_provided)
+
 if 'presentation_data' not in st.session_state:
     st.session_state.presentation_data = None
     st.session_state.narrative_data = None
 
 
-if st.button("Generar Presentación"):
+if st.button("Generar Presentación", disabled=is_button_disabled):
     st.info("Botón 'Generar Presentación' presionado.")
     text_to_process = ""
     
@@ -287,7 +292,6 @@ if st.button("Generar Presentación"):
             if slides_data:
                 st.info("Datos de las diapositivas recibidos de la IA.")
                 
-                # Se eliminó la opción de plantilla, ahora se usa siempre la estándar
                 prs = create_presentation(slides_data, presentation_title, presentation_subtitle)
                 
                 pptx_file = BytesIO()
