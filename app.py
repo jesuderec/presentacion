@@ -259,4 +259,102 @@ image_size_option = st.selectbox(
     options=["1024x1024", "1792x1024", "1024x1792"]
 )
 
-presentation_title = st.text_input("Título de la presentación:",
+presentation_title = st.text_input("Título de la presentación:", value="")
+presentation_subtitle = st.text_input("Subtítulo (opcional):", value="")
+num_slides = st.slider(
+    "Número de diapositivas (excluyendo la portada):",
+    min_value=3,
+    max_value=10,
+    value=5
+)
+
+uploaded_file = st.file_uploader(
+    "Sube un archivo (.txt, .docx, .pdf)",
+    type=["txt", "docx", "pdf"]
+)
+st.markdown("---")
+st.markdown("O pega tu texto directamente aquí:")
+text_input = st.text_area(
+    "Pega tu texto aquí",
+    height=200,
+    placeholder="Ej. El ciclo del agua es el proceso de...\n..."
+)
+
+is_title_provided = bool(presentation_title.strip())
+is_content_provided = (uploaded_file is not None) or (bool(text_input.strip()))
+is_button_disabled = not (is_title_provided and is_content_provided)
+
+if 'presentation_data' not in st.session_state:
+    st.session_state.presentation_data = None
+    st.session_state.narrative_data = None
+
+if st.button("Generar Presentación", disabled=is_button_disabled):
+    st.info("Botón 'Generar Presentación' presionado.")
+    text_to_process = ""
+    if uploaded_file is not None:
+        file_extension = uploaded_file.name.split(".")[-1].lower()
+        if file_extension == "txt":
+            text_to_process = read_text_from_txt(uploaded_file)
+        elif file_extension == "docx":
+            text_to_process = read_text_from_docx(uploaded_file)
+        elif file_extension == "pdf":
+            text_to_process = read_text_from_pdf(uploaded_file)
+    elif text_input:
+        text_to_process = text_input
+    
+    if not text_to_process:
+        st.warning("Por favor, introduce un texto o sube un archivo para generar la presentación.")
+        logging.warning("No se proporcionó texto ni archivo.")
+    else:
+        st.info("Iniciando el proceso de generación.")
+        with st.spinner("Procesando texto y generando presentación..."):
+            
+            selected_ai_key = get_api_key(model_text_option)
+            if not selected_ai_key:
+                st.error("No se encontró la clave de API para el modelo seleccionado. Por favor, configura tus secretos.")
+                st.stop()
+            slides_data = generate_slides_data_with_ai(text_to_process, num_slides, model_text_option, selected_ai_key)
+            
+            if slides_data:
+                st.info("Datos de las diapositivas recibidos de la IA.")
+                
+                prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_size_option, model_text_option)
+                
+                pptx_file = BytesIO()
+                prs.save(pptx_file)
+                pptx_file.seek(0)
+                st.session_state.presentation_data = pptx_file
+                
+                narrative_full_text = ""
+                for i, slide in enumerate(slides_data.get("slides", [])):
+                    narrative_full_text += f"Diapositiva {i+1}: {slide['title']}\n\n"
+                    narrative_full_text += f"{slide['narrative']}\n\n"
+                
+                if slides_data.get("references"):
+                    narrative_full_text += "Referencias Bibliográficas:\n"
+                    for ref in slides_data["references"]:
+                        narrative_full_text += f"- {ref}\n"
+                st.session_state.narrative_data = narrative_full_text.encode('utf-8')
+                
+                st.success("¡Presentación y narrativa generadas con éxito!")
+                logging.info("Proceso de generación finalizado con éxito.")
+
+if st.session_state.presentation_data is not None:
+    with st.expander("📝 Narrativa y Referencias para el Presentador"):
+        st.write(st.session_state.narrative_data.decode('utf-8'))
+        
+    col1, col2 = st.columns(2)
+    with col1:
+        st.download_button(
+            label="Descargar presentación (.pptx)",
+            data=st.session_state.presentation_data,
+            file_name="presentacion_ia_con_narrativa.pptx",
+            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        )
+    with col2:
+        st.download_button(
+            label="Descargar narrativa (.txt)",
+            data=st.session_state.narrative_data,
+            file_name="narrativa_presentacion.txt",
+            mime="text/plain"
+        )
