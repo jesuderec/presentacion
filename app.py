@@ -90,10 +90,21 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
             response = model.generate_content(prompt)
             ai_response_content = response.text
         
-        json_start = ai_response_content.find('{')
-        json_end = ai_response_content.rfind('}') + 1
-        clean_json = ai_response_content[json_start:json_end]
-        
+        # LÓGICA MEJORADA PARA EXTRAER JSON DE LA RESPUESTA DE LA IA
+        # Paso 1: Intentar extraer el JSON de un bloque de código markdown
+        clean_json_match = re.search(r'```(?:json)?\s*({.*?})\s*```', ai_response_content, re.DOTALL)
+        if clean_json_match:
+            clean_json = clean_json_match.group(1)
+        else:
+            # Paso 2: Si no se encuentra un bloque de código, buscar los primeros y últimos corchetes
+            json_start = ai_response_content.find('{')
+            json_end = ai_response_content.rfind('}') + 1
+            if json_start != -1 and json_end != 0:
+                clean_json = ai_response_content[json_start:json_end]
+            else:
+                st.error("Error de la IA: La respuesta no contiene un objeto JSON válido.")
+                return None
+
         try:
             return json.loads(clean_json)
         except json.JSONDecodeError as e:
