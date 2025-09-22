@@ -16,7 +16,7 @@ import re
 import openai
 import google.generativeai as genai
 
-# Configuración básica de registro
+# Configuración básica de registro (no se mostrará en la app)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
@@ -79,10 +79,9 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
         elif isinstance(parsed_data, dict) and "slides" in parsed_data:
             return parsed_data
         else:
-            st.error("Error: El JSON de la IA no tiene el formato esperado.")
             return None
     except Exception as e:
-        st.error(f"Error al generar o procesar la respuesta de la IA: {e}")
+        logging.error(f"Error al procesar con IA: {e}")
         return None
 
 # --- Generación de imágenes con IA ---
@@ -96,42 +95,34 @@ def generate_image_with_ai(prompt, model_name, size, api_key):
             image_response.raise_for_status()
             return Image.open(io.BytesIO(image_response.content))
         except Exception as e:
-            st.warning(f"No se pudo generar imagen con DALL-E: {e}. Usando placeholder.")
+            logging.warning(f"Error al generar imagen con DALL-E: {e}")
     
     try:
-        # Usar una ruta relativa segura para el placeholder
         script_dir = os.path.dirname(os.path.abspath(__file__))
         placeholder_path = os.path.join(script_dir, "assets", "images", "placeholder.png")
         return Image.open(placeholder_path)
     except Exception:
-        # Si todo falla, crear una imagen gris
         return Image.new('RGB', (512, 512), color = 'gray')
-
 
 # --- Funciones para crear presentación ---
 def create_presentation(slides_data, presentation_title, presentation_subtitle, image_model, image_size, text_model_option):
     try:
         prs = Presentation()
-        # Definir colores para la plantilla
         color_fondo = RGBColor(82, 0, 41)
         color_texto = RGBColor(255, 255, 255)
 
-        # Aplicar fondo a la diapositiva maestra
         master = prs.slide_masters[0]
         fill = master.background.fill
         fill.solid()
         fill.fore_color.rgb = color_fondo
 
-        # Aplicar color de texto a los títulos de la maestra
         for shape in master.shapes:
             if shape.has_text_frame and "title" in shape.name.lower():
                  shape.text_frame.paragraphs[0].font.color.rgb = color_texto
 
-        # Definir layouts a usar
         title_slide_layout = prs.slide_layouts[0]
         content_layout = prs.slide_layouts[1]
         
-        # Diapositiva de Título
         slide = prs.slides.add_slide(title_slide_layout)
         title = slide.shapes.title
         subtitle = slide.placeholders[1]
@@ -139,16 +130,18 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
         subtitle.text = presentation_subtitle
         title.text_frame.paragraphs[0].font.color.rgb = color_texto
         subtitle.text_frame.paragraphs[0].font.color.rgb = color_texto
+        title.text_frame.paragraphs[0].font.size = Pt(44)
+        subtitle.text_frame.paragraphs[0].font.size = Pt(28)
 
         openai_api_key = get_api_key("gpt-4o-mini")
 
-        # Diapositivas de Contenido
         for slide_info in slides_data.get("slides", []):
             try:
                 slide = prs.slides.add_slide(content_layout)
                 title_shape = slide.shapes.title
                 title_shape.text = slide_info.get("title", "")
                 title_shape.text_frame.paragraphs[0].font.color.rgb = color_texto
+                title_shape.text_frame.paragraphs[0].font.size = Pt(32)
 
                 body_shape = slide.placeholders[1]
                 tf = body_shape.text_frame
@@ -157,6 +150,7 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                     p = tf.add_paragraph()
                     p.text = bullet_point
                     p.font.color.rgb = color_texto
+                    p.font.size = Pt(20)
                     p.level = 0
                 
                 prompt_imagen = slide_info.get('image_description', f"Imagen sobre {slide_info.get('title', '')}")
@@ -166,24 +160,24 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                     img_stream = io.BytesIO()
                     image.save(img_stream, format='PNG')
                     img_stream.seek(0)
-                    left, top, width = Inches(6.5), Inches(2.0), Inches(5.0)
+                    left, top, width = Inches(6.2), Inches(2.5), Inches(3.5)
                     slide.shapes.add_picture(img_stream, left, top, width=width)
             
             except Exception as e:
-                st.error(f"Error al procesar la diapositiva '{slide_info.get('title', '')}': {e}")
+                logging.error(f"Error al procesar diapositiva: {e}")
                 continue
 
-        # Diapositiva Final
         slide = prs.slides.add_slide(title_slide_layout)
         title = slide.shapes.title
         subtitle = slide.placeholders[1]
         title.text = "¡Gracias!"
         subtitle.text = ""
         title.text_frame.paragraphs[0].font.color.rgb = color_texto
+        title.text_frame.paragraphs[0].font.size = Pt(60)
 
         return prs
     except Exception as e:
-        st.error(f"No se pudo crear el archivo PowerPoint. Razón: {e}")
+        logging.error(f"Error al crear la presentación: {e}")
         return None
 
 # --- Funciones para leer archivos ---
@@ -216,7 +210,7 @@ st.markdown("---")
 with st.sidebar:
     st.header("⚙️ Configuración")
     model_text_option = st.selectbox("Elige la IA para generar el texto:", ["gpt-4o-mini", "deepseek-chat", "gemini-1.5-pro"])
-    image_model_option = st.selectbox("Elige la IA para generar imágenes:", ["DALL-E", "Placeholder"])
+    image_model_option = st.selectbox("Elige la IA para generar imágenes:", ["Placeholder", "DALL-E"])
     image_size_option = st.selectbox("Elige la resolución (DALL-E):", ["1024x1024", "1792x1024", "1024x1792"])
     max_text_length = st.slider("Límite de caracteres para la IA:", 500, 10000, 2000, 100)
 
@@ -249,28 +243,30 @@ col1, col2 = st.columns(2)
 with col1:
     if st.button("Generar Presentación", disabled=is_button_disabled):
         text_to_process = text_to_process_view[:max_text_length]
-        if len(text_to_process_view) > max_text_length:
-            st.warning(f"El texto se ha truncado a {max_text_length} caracteres.")
+        
         if text_to_process.strip():
-            with st.spinner("Generando esquema con IA..."):
+            with st.spinner("Procesando..."):
                 selected_ai_key = get_api_key(model_text_option)
                 if not selected_ai_key:
                     st.error(f"La clave de API para {model_text_option} no está configurada.")
                 else:
                     slides_data = generate_slides_data_with_ai(text_to_process, num_slides, model_text_option, selected_ai_key)
                     if slides_data:
-                        with st.spinner("Creando presentación y generando imágenes..."):
-                            prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_model_option, image_size_option, model_text_option)
-                            if prs:
-                                pptx_file = BytesIO()
-                                prs.save(pptx_file)
-                                pptx_file.seek(0)
-                                st.session_state.presentation_data = pptx_file
-                                narrative_full_text = ""
-                                for i, slide in enumerate(slides_data.get("slides", [])):
-                                    narrative_full_text += f"Diapositiva {i+1}: {slide.get('title', '')}\n\n{slide.get('narrative', '')}\n\nDescripción de imagen: {slide.get('image_description', '')}\n\n---\n\n"
-                                st.session_state.narrative_data = narrative_full_text.encode('utf-8')
-                                st.success("¡Presentación generada con éxito! 🎉")
+                        prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_model_option, image_size_option, model_text_option)
+                        if prs:
+                            pptx_file = BytesIO()
+                            prs.save(pptx_file)
+                            pptx_file.seek(0)
+                            st.session_state.presentation_data = pptx_file
+                            narrative_full_text = ""
+                            for i, slide in enumerate(slides_data.get("slides", [])):
+                                narrative_full_text += f"Diapositiva {i+1}: {slide.get('title', '')}\n\n{slide.get('narrative', '')}\n\nDescripción de imagen: {slide.get('image_description', '')}\n\n---\n\n"
+                            st.session_state.narrative_data = narrative_full_text.encode('utf-8')
+                            st.success("¡Presentación generada con éxito! 🎉")
+                        else:
+                            st.error("No se pudo crear el archivo PowerPoint.")
+                    else:
+                        st.error("La IA no pudo generar un esquema válido.")
         else:
             st.error("No hay contenido para procesar.")
 
