@@ -44,7 +44,7 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
     try:
         headers = {
             'Content-Type': 'application/json',
-            'Authorization': f'Bearer {{api_key}}'
+            'Authorization': f'Bearer {api_key}'
         }
         
         prompt = f"""
@@ -59,7 +59,7 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
         if "deepseek" in model_name:
             api_url = "https://api.deepseek.com/v1/chat/completions"
             payload = {
-                "model": "deepseek-chat", # Modelo actualizado
+                "model": "deepseek-chat",
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.7,
                 "stream": False
@@ -67,7 +67,13 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
             try:
                 response = requests.post(api_url, headers=headers, data=json.dumps(payload))
                 response.raise_for_status()
-                ai_response_content = response.json()["choices"][0]["message"]["content"]
+                # AÑADIDO: Manejo de errores de la respuesta JSON
+                try:
+                    response_json = response.json()
+                    ai_response_content = response_json["choices"][0]["message"]["content"]
+                except (json.JSONDecodeError, KeyError) as json_error:
+                    st.error(f"Error de formato JSON en la respuesta de DeepSeek. Razón: {json_error}. Respuesta completa: {response.text}")
+                    return None
             except requests.exceptions.RequestException as e:
                 st.error(f"Error de conexión con la API de DeepSeek: {e}")
                 return None
