@@ -77,7 +77,6 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
                 try:
                     response_json = response.json()
                     ai_response_content = response_json["choices"][0]["message"]["content"]
-                    st.info(f"Respuesta cruda de la IA (para depuración):\n\n{ai_response_content}") # Agregado para depuración
                 except (json.JSONDecodeError, KeyError) as json_error:
                     st.error(f"Error de formato JSON en la respuesta de DeepSeek. Razón: {json_error}. Respuesta completa: {response.text}")
                     return None
@@ -97,13 +96,10 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
             response = model.generate_content(prompt)
             ai_response_content = response.text
         
-        # LÓGICA MEJORADA PARA EXTRAER JSON DE LA RESPUESTA DE LA IA
-        # Paso 1: Intentar extraer el JSON de un bloque de código markdown
         clean_json_match = re.search(r'```(?:json)?\s*({.*?})\s*```', ai_response_content, re.DOTALL)
         if clean_json_match:
             clean_json = clean_json_match.group(1)
         else:
-            # Paso 2: Si no se encuentra un bloque de código, buscar los primeros y últimos corchetes
             json_start = ai_response_content.find('{')
             json_end = ai_response_content.rfind('}') + 1
             if json_start != -1 and json_end != 0:
@@ -142,7 +138,6 @@ def generate_image_with_ai(prompt, model_name, size, api_key):
             logging.error(f"Error al generar imagen con DALL-E: {e}")
             return None
     
-    # Placeholder de fallback
     try:
         image_path = "assets/images/placeholder.png"
         return Image.open(image_path)
@@ -152,74 +147,33 @@ def generate_image_with_ai(prompt, model_name, size, api_key):
 
 # --- Funciones para crear presentación ---
 def create_presentation(slides_data, presentation_title, presentation_subtitle, image_model, image_size, text_model_option):
-    prs = Presentation()
-    
-    # Diapositiva de título
-    title_slide_layout = prs.slide_layouts[0]
-    title_slide = prs.slides.add_slide(title_slide_layout)
-    if title_slide.shapes.title is not None:
-        title_shape = title_slide.shapes.title
-        title_shape.text = presentation_title
-        title_shape.text_frame.paragraphs[0].font.size = Pt(44)
-    else:
-        textbox = title_slide.shapes.add_textbox(Inches(1), Inches(1), Inches(8), Inches(2))
-        tf = textbox.text_frame
-        p = tf.paragraphs[0]
-        run = p.add_run()
-        run.text = presentation_title
-        run.font.size = Pt(44)
+    try:
+        # Usamos la plantilla para que los layouts sean correctos
+        template_path = os.path.join("assets", "templates", "UNRC_presentacion.pptx")
+        prs = Presentation(template_path)
         
-    if presentation_subtitle:
-        subtitle_shape = None
-        for shape in title_slide.placeholders:
-            if shape.is_placeholder and shape.placeholder_format.idx == 1:
-                subtitle_shape = shape
-                break
+        # Diapositiva de título (Layout 0)
+        title_slide_layout = prs.slide_layouts[0]
+        title_slide = prs.slides.add_slide(title_slide_layout)
+        title_placeholder = title_slide.placeholders[0]
+        title_placeholder.text = presentation_title
+        if presentation_subtitle:
+            subtitle_placeholder = title_slide.placeholders[1]
+            subtitle_placeholder.text = presentation_subtitle
         
-        if subtitle_shape is not None:
-            subtitle_shape.text = presentation_subtitle
-            subtitle_shape.text_frame.paragraphs[0].font.size = Pt(16)
-        else:
-            subtitle_textbox = title_slide.shapes.add_textbox(Inches(1), Inches(2.5), Inches(8), Inches(1))
-            tf = subtitle_textbox.text_frame
-            p = tf.paragraphs[0]
-            run = p.add_run()
-            run.text = presentation_subtitle
-            run.font.size = Pt(16)
+        # Diapositivas de contenido (Layout 1)
+        content_layout = prs.slide_layouts[1]
+        openai_api_key = get_api_key("gpt-3.5-turbo")
 
-    content_layout_index = 1
-    
-    openai_api_key = get_api_key("gpt-3.5-turbo")
-    
-    for slide_info in slides_data.get("slides", []):
-        try:
-            slide_layout = prs.slide_layouts[content_layout_index]
-            slide = prs.slides.add_slide(slide_layout)
+        for slide_info in slides_data.get("slides", []):
+            slide = prs.slides.add_slide(content_layout)
+            slide.shapes.title.text = slide_info.get("title", "")
+
+            bullets_text = "\n".join(slide_info.get("bullets", []))
+            body_shape = slide.placeholders[1]
+            body_shape.text = bullets_text
             
-            if slide.shapes.title:
-                slide.shapes.title.text = slide_info.get("title", "")
-                slide.shapes.title.text_frame.paragraphs[0].font.size = Pt(40)
-            else:
-                textbox = slide.shapes.add_textbox(Inches(1), Inches(0.5), Inches(8), Inches(1))
-                textbox.text_frame.paragraphs[0].font.size = Pt(40)
-                textbox.text = slide_info.get("title", "")
-
-            bullets = slide_info.get("bullets", [])
-            body_shape = None
-            for shape in slide.placeholders:
-                if shape.is_placeholder and shape.placeholder_format.idx == 1:
-                    body_shape = shape
-                    break
-
-            if body_shape:
-                body_shape.text = "\n".join(bullets)
-            else:
-                textbox = slide.shapes.add_textbox(Inches(1), Inches(1.5), Inches(8), Inches(4))
-                tf = textbox.text_frame
-                for bullet in bullets:
-                    p = tf.add_paragraph()
-                    p.text = bullet
-            
+            # Generación y adición de la imagen
             image = None
             if image_model == "DALL-E":
                 if openai_api_key:
@@ -235,6 +189,7 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                 image.save(img_stream, format='PNG')
                 img_stream.seek(0)
                 
+                # Coordenadas y tamaño de la imagen ajustadas
                 left_inches = 14 / 2.54
                 top_inches = 7 / 2.54
                 width_inches = 10 / 2.54
@@ -242,28 +197,25 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                 
                 slide.shapes.add_picture(img_stream, Inches(left_inches), Inches(top_inches), width=Inches(width_inches), height=Inches(height_inches))
 
-        except IndexError:
-            logging.error(f"Error: La plantilla no tiene el layout de diapositiva {content_layout_index}. Usando un layout predeterminado.")
-            fallback_layout = prs.slide_layouts[1]
-            slide = prs.slides.add_slide(fallback_layout)
-            slide.shapes.title.text = slide_info["title"]
-            body_shape = slide.placeholders[1]
-            body_shape.text = "\n".join(slide_info["bullets"])
-    
-    # Diapositiva final de "Gracias"
-    final_slide_layout = prs.slide_layouts[0]
-    final_slide = prs.slides.add_slide(final_slide_layout)
-    left = top = Inches(0)
-    width = prs.slide_width
-    height = prs.slide_height
-    textbox = final_slide.shapes.add_textbox(left, top, width, height)
-    tf = textbox.text_frame
-    tf.text = "¡Gracias!"
-    tf.paragraphs[0].font.size = Pt(72)
-    tf.paragraphs[0].alignment = PP_ALIGN.CENTER
-    tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+        # Diapositiva final de "Gracias" (Layout 0)
+        final_slide_layout = prs.slide_layouts[0]
+        final_slide = prs.slides.add_slide(final_slide_layout)
+        left = top = Inches(0)
+        width = prs.slide_width
+        height = prs.slide_height
+        textbox = final_slide.shapes.add_textbox(left, top, width, height)
+        tf = textbox.text_frame
+        tf.text = "¡Gracias!"
+        tf.paragraphs[0].font.size = Pt(72)
+        tf.paragraphs[0].alignment = PP_ALIGN.CENTER
+        tf.vertical_anchor = MSO_ANCHOR.MIDDLE
 
-    return prs
+        return prs
+
+    except Exception as e:
+        logging.error(f"Error en la función create_presentation: {e}")
+        st.error(f"No se pudo crear el archivo PowerPoint. Razón: {e}")
+        return None
 
 # --- Funciones para leer archivos ---
 def read_text_from_txt(uploaded_file):
@@ -401,25 +353,28 @@ with col1:
                         st.info("Paso 4: El esquema de la IA fue generado. Ahora creando el archivo PowerPoint.")
                         prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_model_option, image_size_option, model_text_option)
                         
-                        pptx_file = BytesIO()
-                        prs.save(pptx_file)
-                        pptx_file.seek(0)
-                        st.session_state.presentation_data = pptx_file
-                        
-                        narrative_full_text = ""
-                        for i, slide in enumerate(slides_data.get("slides", [])):
-                            narrative_full_text += f"Diapositiva {i+1}: {slide['title']}\n\n"
-                            narrative_full_text += f"{slide['narrative']}\n\n"
+                        if prs: # Verificamos si la presentación se creó correctamente
+                            pptx_file = BytesIO()
+                            prs.save(pptx_file)
+                            pptx_file.seek(0)
+                            st.session_state.presentation_data = pptx_file
                             
-                            if "image_description" in slide:
-                                narrative_full_text += f"Descripción de la imagen: {slide['image_description']}\n\n"
-                        
-                        if slides_data.get("references"):
-                            narrative_full_text += "Referencias Bibliográficas:\n"
-                            for ref in slides_data["references"]:
-                                narrative_full_text += f"- {ref}\n"
-                        st.session_state.narrative_data = narrative_full_text.encode('utf-8')
-                        st.success("¡Presentación generada con éxito! 🎉")
+                            narrative_full_text = ""
+                            for i, slide in enumerate(slides_data.get("slides", [])):
+                                narrative_full_text += f"Diapositiva {i+1}: {slide['title']}\n\n"
+                                narrative_full_text += f"{slide['narrative']}\n\n"
+                                
+                                if "image_description" in slide:
+                                    narrative_full_text += f"Descripción de la imagen: {slide['image_description']}\n\n"
+                            
+                            if slides_data.get("references"):
+                                narrative_full_text += "Referencias Bibliográficas:\n"
+                                for ref in slides_data["references"]:
+                                    narrative_full_text += f"- {ref}\n"
+                            st.session_state.narrative_data = narrative_full_text.encode('utf-8')
+                            st.success("¡Presentación generada con éxito! 🎉")
+                        else:
+                            st.error("Error: No se pudo crear la presentación. Revisa los logs de error para más detalles.")
                     else:
                         st.error("Error: No se pudo generar un esquema de presentación válido a partir de la respuesta de la IA. Intenta con un texto diferente.")
 
