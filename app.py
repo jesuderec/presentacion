@@ -54,7 +54,6 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
         Texto a analizar: "{optimized_text}"
         """
         ai_response_content = ""
-        # (El resto de la lógica de la IA permanece igual)
         if "deepseek" in model_name:
             api_url = "https://api.deepseek.com/v1/chat/completions"
             payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.7, "response_format": {"type": "json_object"}}
@@ -100,61 +99,56 @@ def generate_image_with_ai(prompt, model_name, size, api_key):
             st.warning(f"No se pudo generar imagen con DALL-E: {e}. Usando placeholder.")
     
     try:
-        return Image.open("assets/images/placeholder.png")
-    except FileNotFoundError:
+        # Usar una ruta relativa segura para el placeholder
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        placeholder_path = os.path.join(script_dir, "assets", "images", "placeholder.png")
+        return Image.open(placeholder_path)
+    except Exception:
+        # Si todo falla, crear una imagen gris
         return Image.new('RGB', (512, 512), color = 'gray')
 
-# --- Funciones para crear presentación (MODIFICADA) ---
+
+# --- Funciones para crear presentación ---
 def create_presentation(slides_data, presentation_title, presentation_subtitle, image_model, image_size, text_model_option):
     try:
-        # 1. Crear una presentación desde cero (sin plantilla externa)
         prs = Presentation()
-        
-        # Definir colores básicos para nuestra plantilla
-        color_fondo = RGBColor(82, 0, 41) # Un color vino similar al de la UNRC
-        color_texto = RGBColor(255, 255, 255) # Texto blanco
+        # Definir colores para la plantilla
+        color_fondo = RGBColor(82, 0, 41)
+        color_texto = RGBColor(255, 255, 255)
 
-        # 2. Modificar la diapositiva maestra (master) para que todas las diapositivas tengan el mismo fondo
+        # Aplicar fondo a la diapositiva maestra
         master = prs.slide_masters[0]
-        background = master.background
-        fill = background.fill
+        fill = master.background.fill
         fill.solid()
         fill.fore_color.rgb = color_fondo
 
-        # Cambiar el color del texto para los títulos en la diapositiva maestra
+        # Aplicar color de texto a los títulos de la maestra
         for shape in master.shapes:
-            if shape.has_text_frame and shape.text_frame.text == "Click to edit Master title style":
+            if shape.has_text_frame and "title" in shape.name.lower():
                  shape.text_frame.paragraphs[0].font.color.rgb = color_texto
 
-
-        # 3. Definir los diseños (layouts) que vamos a usar
-        # El layout 0 suele ser para el título
+        # Definir layouts a usar
         title_slide_layout = prs.slide_layouts[0]
-        # El layout 1 suele ser para título y contenido
         content_layout = prs.slide_layouts[1]
         
-        # --- Creación de diapositiva de título ---
+        # Diapositiva de Título
         slide = prs.slides.add_slide(title_slide_layout)
         title = slide.shapes.title
         subtitle = slide.placeholders[1]
         title.text = presentation_title
         subtitle.text = presentation_subtitle
-        # Aplicar color al texto del título principal
         title.text_frame.paragraphs[0].font.color.rgb = color_texto
         subtitle.text_frame.paragraphs[0].font.color.rgb = color_texto
 
-
-        # --- Creación de diapositivas de contenido ---
         openai_api_key = get_api_key("gpt-4o-mini")
 
+        # Diapositivas de Contenido
         for slide_info in slides_data.get("slides", []):
             try:
                 slide = prs.slides.add_slide(content_layout)
-                
-                # Asignar título y contenido
                 title_shape = slide.shapes.title
                 title_shape.text = slide_info.get("title", "")
-                title_shape.text_frame.paragraphs[0].font.color.rgb = color_texto # Color al título
+                title_shape.text_frame.paragraphs[0].font.color.rgb = color_texto
 
                 body_shape = slide.placeholders[1]
                 tf = body_shape.text_frame
@@ -162,10 +156,9 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                 for bullet_point in slide_info.get("bullets", []):
                     p = tf.add_paragraph()
                     p.text = bullet_point
-                    p.font.color.rgb = color_texto # Color a las viñetas
+                    p.font.color.rgb = color_texto
                     p.level = 0
                 
-                # Generar y añadir imagen
                 prompt_imagen = slide_info.get('image_description', f"Imagen sobre {slide_info.get('title', '')}")
                 image = generate_image_with_ai(prompt_imagen, image_model, image_size, openai_api_key)
 
@@ -173,8 +166,6 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                     img_stream = io.BytesIO()
                     image.save(img_stream, format='PNG')
                     img_stream.seek(0)
-                    
-                    # Posición y tamaño de la imagen
                     left, top, width = Inches(6.5), Inches(2.0), Inches(5.0)
                     slide.shapes.add_picture(img_stream, left, top, width=width)
             
@@ -182,21 +173,20 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                 st.error(f"Error al procesar la diapositiva '{slide_info.get('title', '')}': {e}")
                 continue
 
-        # --- Diapositiva final de "Gracias" ---
+        # Diapositiva Final
         slide = prs.slides.add_slide(title_slide_layout)
         title = slide.shapes.title
         subtitle = slide.placeholders[1]
         title.text = "¡Gracias!"
-        subtitle.text = "" # Dejar el subtítulo vacío
+        subtitle.text = ""
         title.text_frame.paragraphs[0].font.color.rgb = color_texto
 
         return prs
-
     except Exception as e:
         st.error(f"No se pudo crear el archivo PowerPoint. Razón: {e}")
         return None
 
-# --- Funciones para leer archivos (sin cambios) ---
+# --- Funciones para leer archivos ---
 def read_text_from_txt(uploaded_file):
     uploaded_file.seek(0)
     return uploaded_file.read().decode("utf-8")
@@ -218,7 +208,7 @@ def read_text_from_docx(uploaded_file):
         text += paragraph.text + "\n"
     return text
 
-# --- Interfaz de Streamlit (sin cambios) ---
+# --- Interfaz de Streamlit ---
 st.title("Generador de Presentaciones 🤖✨🖼️")
 st.markdown("Crea una presentación y su guion a partir de tu texto o archivo.")
 st.markdown("---")
@@ -242,10 +232,8 @@ text_input = st.text_area("Pega tu texto aquí", height=200, placeholder="Ej. El
 
 is_button_disabled = not (bool(presentation_title.strip()) and (bool(uploaded_file) or bool(text_input.strip())))
 
-# (El resto de la interfaz de Streamlit permanece igual)
 text_to_process_view = ""
 if uploaded_file:
-    # Lógica para leer el archivo
     file_extension = os.path.splitext(uploaded_file.name)[1].lower()
     read_funcs = {".txt": read_text_from_txt, ".docx": read_text_from_docx, ".pdf": read_text_from_pdf}
     if file_extension in read_funcs:
@@ -263,7 +251,6 @@ with col1:
         text_to_process = text_to_process_view[:max_text_length]
         if len(text_to_process_view) > max_text_length:
             st.warning(f"El texto se ha truncado a {max_text_length} caracteres.")
-
         if text_to_process.strip():
             with st.spinner("Generando esquema con IA..."):
                 selected_ai_key = get_api_key(model_text_option)
@@ -279,11 +266,9 @@ with col1:
                                 prs.save(pptx_file)
                                 pptx_file.seek(0)
                                 st.session_state.presentation_data = pptx_file
-                                
                                 narrative_full_text = ""
                                 for i, slide in enumerate(slides_data.get("slides", [])):
                                     narrative_full_text += f"Diapositiva {i+1}: {slide.get('title', '')}\n\n{slide.get('narrative', '')}\n\nDescripción de imagen: {slide.get('image_description', '')}\n\n---\n\n"
-                                
                                 st.session_state.narrative_data = narrative_full_text.encode('utf-8')
                                 st.success("¡Presentación generada con éxito! 🎉")
         else:
@@ -291,18 +276,22 @@ with col1:
 
 with col2:
     if st.button("Limpiar"):
-        st.session_state.clear()
+        for key in ['presentation_data', 'narrative_data']:
+            if key in st.session_state:
+                del st.session_state[key]
         st.rerun()
 
 if st.session_state.get('presentation_data'):
     st.markdown("---")
     st.header("✅ ¡Listo para descargar!")
-    with st.expander("📝 Ver Narrativa para el Presentador"):
-        st.text(st.session_state.narrativa_data.decode('utf-8'))
+    if 'narrative_data' in st.session_state:
+        with st.expander("📝 Ver Narrativa para el Presentador"):
+            st.text(st.session_state.narrative_data.decode('utf-8'))
         
     col1_dl, col2_dl = st.columns(2)
     file_name_prefix = re.sub(r'[\s/\\:*?"<>|]', '_', presentation_title).lower() or 'presentacion'
     with col1_dl:
         st.download_button("Descargar presentación (.pptx)", st.session_state.presentation_data, f"{file_name_prefix}.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation")
-    with col2_dl:
-        st.download_button("Descargar narrativa (.txt)", st.session_state.narrativa_data, f"narrativa_{file_name_prefix}.txt", "text/plain")
+    if 'narrative_data' in st.session_state:
+        with col2_dl:
+            st.download_button("Descargar narrativa (.txt)", st.session_state.narrative_data, f"narrativa_{file_name_prefix}.txt", "text/plain")
