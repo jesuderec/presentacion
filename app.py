@@ -57,7 +57,7 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
         prompt = f"""
         A partir del siguiente texto, genera un esquema de presentación en formato JSON.
         El esquema debe tener un máximo de {num_slides} diapositivas.
-        Cada diapositiva debe tener las claves: "title", "bullets" (una lista de puntos clave), y "narrative" (un párrafo detallado).
+        Cada diapositiva debe tener las claves: "title", "bullets" (una lista de puntos clave), "narrative" (un párrafo detallado) y "image_description" (una descripción breve y concisa para generar una imagen).
         El texto a analizar es:
         "{optimized_text}"
         """
@@ -136,7 +136,8 @@ def generate_image_with_ai(prompt, model_name, size, api_key):
             return Image.open(io.BytesIO(image_response.content))
         except Exception as e:
             logging.error(f"Error al generar imagen con DALL-E: {e}")
-            return None
+            st.warning("No se pudo generar la imagen con DALL-E. Usando imagen de marcador de posición.")
+            return generate_image_with_ai(None, model_name="Placeholder", size=None, api_key=None)
     
     try:
         image_path = "assets/images/placeholder.png"
@@ -186,60 +187,70 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
         openai_api_key = get_api_key("gpt-3.5-turbo")
 
         for slide_info in slides_data.get("slides", []):
-            slide = prs.slides.add_slide(content_layout)
-            
-            # Añadir título del contenido de forma segura
-            content_title_placeholder = None
-            body_shape = None
-            for placeholder in slide.placeholders:
-                if placeholder.has_text_frame:
-                    if placeholder.is_title:
-                        content_title_placeholder = placeholder
-                    elif placeholder.placeholder_format.idx == 1:
-                        body_shape = placeholder
+            try:
+                slide = prs.slides.add_slide(content_layout)
+                
+                # Añadir título del contenido de forma segura
+                content_title_placeholder = None
+                body_shape = None
+                for placeholder in slide.placeholders:
+                    if placeholder.has_text_frame:
+                        if placeholder.is_title:
+                            content_title_placeholder = placeholder
+                        elif placeholder.placeholder_format.idx == 1:
+                            body_shape = placeholder
 
-            if content_title_placeholder:
-                content_title_placeholder.text = slide_info.get("title", "")
-            else:
-                left = top = width = height = Inches(1)
-                txBox = slide.shapes.add_textbox(left, top, width, height)
-                tf = txBox.text_frame
-                tf.text = slide_info.get("title", "")
-            
-            # Añadir viñetas del contenido de forma segura
-            if body_shape:
-                bullets_text = "\n".join(slide_info.get("bullets", []))
-                body_shape.text = bullets_text
-            else:
-                left = top = width = height = Inches(1)
-                txBox = slide.shapes.add_textbox(left, Inches(2), width, height)
-                tf = txBox.text_frame
-                for bullet in slide_info.get("bullets", []):
-                    p = tf.add_paragraph()
-                    p.text = bullet
-            
-            # Generación y adición de la imagen
-            image = None
-            if image_model == "DALL-E":
-                if openai_api_key:
-                    prompt_imagen = f"Imagen minimalista para presentación educativa sobre {slide_info.get('title', '')}"
-                    image = generate_image_with_ai(prompt_imagen, model_name=image_model, size=image_size, api_key=openai_api_key)
+                if content_title_placeholder:
+                    content_title_placeholder.text = slide_info.get("title", "")
                 else:
-                    logging.error("La clave de API de OpenAI no está configurada.")
-            else:
-                image = generate_image_with_ai(None, model_name="Placeholder", size=None, api_key=None)
+                    left = top = width = height = Inches(1)
+                    txBox = slide.shapes.add_textbox(left, top, width, height)
+                    tf = txBox.text_frame
+                    tf.text = slide_info.get("title", "")
+                
+                # Añadir viñetas del contenido de forma segura
+                if body_shape:
+                    bullets_text = "\n".join(slide_info.get("bullets", []))
+                    body_shape.text = bullets_text
+                else:
+                    left = top = width = height = Inches(1)
+                    txBox = slide.shapes.add_textbox(left, Inches(2), width, height)
+                    tf = txBox.text_frame
+                    for bullet in slide_info.get("bullets", []):
+                        p = tf.add_paragraph()
+                        p.text = bullet
+                
+                # Generación y adición de la imagen
+                image = None
+                if image_model == "DALL-E":
+                    if openai_api_key:
+                        prompt_imagen = slide_info.get('image_description', f"Imagen minimalista para presentación educativa sobre {slide_info.get('title', '')}")
+                        image = generate_image_with_ai(prompt_imagen, model_name=image_model, size=image_size, api_key=openai_api_key)
+                    else:
+                        logging.error("La clave de API de OpenAI no está configurada.")
+                        st.warning("La clave de API de OpenAI no está configurada. Usando imagen de marcador de posición.")
+                        image = generate_image_with_ai(None, model_name="Placeholder", size=None, api_key=None)
+                else:
+                    image = generate_image_with_ai(None, model_name="Placeholder", size=None, api_key=None)
 
-            if image:
-                img_stream = io.BytesIO()
-                image.save(img_stream, format='PNG')
-                img_stream.seek(0)
-                
-                left_inches = 14 / 2.54
-                top_inches = 7 / 2.54
-                width_inches = 10 / 2.54
-                height_inches = 11 / 2.54
-                
-                slide.shapes.add_picture(img_stream, Inches(left_inches), Inches(top_inches), width=Inches(width_inches), height=Inches(height_inches))
+                if image:
+                    img_stream = io.BytesIO()
+                    image.save(img_stream, format='PNG')
+                    img_stream.seek(0)
+                    
+                    left_inches = 14 / 2.54
+                    top_inches = 7 / 2.54
+                    width_inches = 10 / 2.54
+                    height_inches = 11 / 2.54
+                    
+                    slide.shapes.add_picture(img_stream, Inches(left_inches), Inches(top_inches), width=Inches(width_inches), height=Inches(height_inches))
+            
+            except Exception as e:
+                logging.error(f"Error al procesar la diapositiva: {e}")
+                st.error(f"Error al procesar la diapositiva {slide_info.get('title', '')}. Razón: {e}")
+                # Continúa con la siguiente diapositiva si ocurre un error
+                continue
+
 
         # Diapositiva final de "Gracias"
         final_slide_layout = prs.slide_layouts[0]
