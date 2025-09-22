@@ -22,12 +22,13 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # --- Configuración de la API ---
 def get_api_key(model_name):
-    if model_name == "deepseek-coder":
-        return st.secrets.get("DEEPSEEK_API_KEY")
+    # CORRECCIÓN: Usar os.getenv para obtener las claves de las variables de entorno
+    if model_name == "deepseek-chat":
+        return os.getenv("DEEPSEEK_API_KEY")
     elif "gpt" in model_name:
-        return st.secrets.get("OPENAI_API_KEY")
+        return os.getenv("OPENAI_API_KEY")
     elif "gemini" in model_name:
-        return st.secrets.get("GEMINI_API_KEY")
+        return os.getenv("GEMINI_API_KEY")
     return None
 
 def setup_openai_client(api_key):
@@ -67,7 +68,6 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
             try:
                 response = requests.post(api_url, headers=headers, data=json.dumps(payload))
                 response.raise_for_status()
-                # AÑADIDO: Manejo de errores de la respuesta JSON
                 try:
                     response_json = response.json()
                     ai_response_content = response_json["choices"][0]["message"]["content"]
@@ -374,7 +374,7 @@ with col1:
             with st.spinner("Procesando texto y generando presentación..."):
                 selected_ai_key = get_api_key(model_text_option)
                 if not selected_ai_key:
-                    st.error(f"Error: La clave de API para {model_text_option} no está configurada. Asegúrate de que esté en tu archivo `secrets.toml`.")
+                    st.error(f"Error: La clave de API para {model_text_option} no está configurada. Asegúrate de que esté configurada como una variable de entorno.")
                 else:
                     st.info("Paso 3: Llamando al modelo de IA para generar el esquema.")
                     slides_data = generate_slides_data_with_ai(text_to_process, num_slides, model_text_option, selected_ai_key)
