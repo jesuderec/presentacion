@@ -71,6 +71,7 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
                 try:
                     response_json = response.json()
                     ai_response_content = response_json["choices"][0]["message"]["content"]
+                    st.info(f"Respuesta cruda de la IA (para depuración):\n\n{ai_response_content}") # Agregado para depuración
                 except (json.JSONDecodeError, KeyError) as json_error:
                     st.error(f"Error de formato JSON en la respuesta de DeepSeek. Razón: {json_error}. Respuesta completa: {response.text}")
                     return None
