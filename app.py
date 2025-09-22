@@ -85,7 +85,6 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
         return json.loads(clean_json)
     except Exception as e:
         logging.error(f"Error al procesar con la IA de texto: {e}")
-        # AÑADIDO: mostrar error específico para el usuario
         st.error(f"Error de la IA: No se pudo generar el esquema de presentación. Razón: {e}")
         return None
 
@@ -306,9 +305,27 @@ if 'presentation_data' not in st.session_state:
     st.session_state.presentation_data = None
     st.session_state.narrative_data = None
 
+# AÑADIDO: Venta de visualización del texto
+text_to_process_view = ""
+if uploaded_file is not None:
+    file_extension = uploaded_file.name.split(".")[-1].lower()
+    if file_extension == "txt":
+        text_to_process_view = read_text_from_txt(uploaded_file)
+    elif file_extension == "docx":
+        text_to_process_view = read_text_from_docx(uploaded_file)
+    elif file_extension == "pdf":
+        text_to_process_view = read_text_from_pdf(uploaded_file)
+elif text_input:
+    text_to_process_view = text_input
+
+if text_to_process_view:
+    with st.expander("🔍 Ver texto extraído del archivo/caja"):
+        st.code(text_to_process_view)
+
 col1, col2 = st.columns(2)
 with col1:
     if st.button("Generar Presentación", disabled=is_button_disabled):
+        st.info("Paso 1: Iniciando la generación de la presentación...")
         text_to_process = ""
         if uploaded_file is not None:
             file_extension = uploaded_file.name.split(".")[-1].lower()
@@ -321,6 +338,8 @@ with col1:
         elif text_input:
             text_to_process = text_input
         
+        st.info(f"Paso 2: Texto extraído. Longitud: {len(text_to_process)} caracteres.")
+
         if not text_to_process:
             st.error("No se pudo extraer texto del archivo o no se proporcionó texto. Intenta con un archivo diferente o pega el texto directamente.")
         else:
@@ -329,9 +348,11 @@ with col1:
                 if not selected_ai_key:
                     st.error(f"Error: La clave de API para {model_text_option} no está configurada.")
                 else:
+                    st.info("Paso 3: Llamando al modelo de IA para generar el esquema.")
                     slides_data = generate_slides_data_with_ai(text_to_process, num_slides, model_text_option, selected_ai_key)
                     
                     if slides_data:
+                        st.info("Paso 4: El esquema de la IA fue generado. Ahora creando el archivo PowerPoint.")
                         prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_model_option, image_size_option, model_text_option)
                         
                         pptx_file = BytesIO()
@@ -353,6 +374,8 @@ with col1:
                                 narrative_full_text += f"- {ref}\n"
                         st.session_state.narrative_data = narrative_full_text.encode('utf-8')
                         st.success("¡Presentación generada con éxito! 🎉")
+                    else:
+                        st.error("Error: No se pudo generar un esquema de presentación válido a partir de la respuesta de la IA.")
 
 with col2:
     if st.button("Limpiar"):
