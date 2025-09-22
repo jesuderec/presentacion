@@ -44,7 +44,7 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
     try:
         headers = {
             'Content-Type': 'application/json',
-            'Authorization': f'Bearer {api_key}'
+            'Authorization': f'Bearer {{api_key}}'
         }
         
         prompt = f"""
@@ -55,17 +55,22 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
         "{optimized_text}"
         """
         
+        ai_response_content = ""
         if "deepseek" in model_name:
             api_url = "https://api.deepseek.com/v1/chat/completions"
             payload = {
-                "model": model_name,
+                "model": "deepseek-chat", # Modelo actualizado
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.7,
                 "stream": False
             }
-            response = requests.post(api_url, headers=headers, data=json.dumps(payload))
-            response.raise_for_status()
-            ai_response_content = response.json()["choices"][0]["message"]["content"]
+            try:
+                response = requests.post(api_url, headers=headers, data=json.dumps(payload))
+                response.raise_for_status()
+                ai_response_content = response.json()["choices"][0]["message"]["content"]
+            except requests.exceptions.RequestException as e:
+                st.error(f"Error de conexión con la API de DeepSeek: {e}")
+                return None
         elif "gpt" in model_name:
             setup_openai_client(api_key)
             response = openai.chat.completions.create(
@@ -82,7 +87,12 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
         json_start = ai_response_content.find('{')
         json_end = ai_response_content.rfind('}') + 1
         clean_json = ai_response_content[json_start:json_end]
-        return json.loads(clean_json)
+        
+        try:
+            return json.loads(clean_json)
+        except json.JSONDecodeError as e:
+            st.error(f"Error de la IA: La respuesta no es un formato JSON válido. Razón: {e}. Respuesta completa de la IA: {ai_response_content}")
+            return None
     except Exception as e:
         logging.error(f"Error al procesar con la IA de texto: {e}")
         st.error(f"Error de la IA: No se pudo generar el esquema de presentación. Razón: {e}")
@@ -261,7 +271,7 @@ with st.sidebar:
     st.header("🤖 Modelos de IA")
     model_text_option = st.selectbox(
         "Elige la IA para generar el texto:",
-        options=["deepseek-coder", "gpt-4o-mini", "gemini-1.5-pro"]
+        options=["deepseek-chat", "gpt-4o-mini", "gemini-1.5-pro"]
     )
     st.header("🖼️ Opciones de Imagen (DALL-E)")
     image_model_option = st.selectbox(
@@ -272,6 +282,15 @@ with st.sidebar:
         "Elige la resolución de las imágenes (DALL-E):",
         options=["1024x1024", "1792x1024", "1024x1792"]
     )
+    st.header("🗜️ Opciones de Texto")
+    max_text_length = st.slider(
+        "Límite de caracteres para la IA:",
+        min_value=500,
+        max_value=10000,
+        value=2000,
+        step=100
+    )
+
 
 # Controles en el cuerpo principal
 st.header("📄 Detalles de la Presentación")
@@ -305,7 +324,6 @@ if 'presentation_data' not in st.session_state:
     st.session_state.presentation_data = None
     st.session_state.narrative_data = None
 
-# AÑADIDO: Venta de visualización del texto
 text_to_process_view = ""
 if uploaded_file is not None:
     file_extension = uploaded_file.name.split(".")[-1].lower()
@@ -338,6 +356,10 @@ with col1:
         elif text_input:
             text_to_process = text_input
         
+        if len(text_to_process) > max_text_length:
+            text_to_process = text_to_process[:max_text_length] + "..."
+            st.warning(f"El texto se ha truncado a {max_text_length} caracteres para evitar errores de límite de tokens de la IA.")
+
         st.info(f"Paso 2: Texto extraído. Longitud: {len(text_to_process)} caracteres.")
 
         if not text_to_process:
@@ -346,7 +368,7 @@ with col1:
             with st.spinner("Procesando texto y generando presentación..."):
                 selected_ai_key = get_api_key(model_text_option)
                 if not selected_ai_key:
-                    st.error(f"Error: La clave de API para {model_text_option} no está configurada.")
+                    st.error(f"Error: La clave de API para {model_text_option} no está configurada. Asegúrate de que esté en tu archivo `secrets.toml`.")
                 else:
                     st.info("Paso 3: Llamando al modelo de IA para generar el esquema.")
                     slides_data = generate_slides_data_with_ai(text_to_process, num_slides, model_text_option, selected_ai_key)
@@ -375,7 +397,7 @@ with col1:
                         st.session_state.narrative_data = narrative_full_text.encode('utf-8')
                         st.success("¡Presentación generada con éxito! 🎉")
                     else:
-                        st.error("Error: No se pudo generar un esquema de presentación válido a partir de la respuesta de la IA.")
+                        st.error("Error: No se pudo generar un esquema de presentación válido a partir de la respuesta de la IA. Intenta con un texto diferente.")
 
 with col2:
     if st.button("Limpiar"):
