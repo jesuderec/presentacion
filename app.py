@@ -148,30 +148,81 @@ def generate_image_with_ai(prompt, model_name, size, api_key):
 # --- Funciones para crear presentación ---
 def create_presentation(slides_data, presentation_title, presentation_subtitle, image_model, image_size, text_model_option):
     try:
-        # Usamos la plantilla para que los layouts sean correctos
         template_path = os.path.join("assets", "templates", "UNRC_presentacion.pptx")
         prs = Presentation(template_path)
         
         # Diapositiva de título (Layout 0)
         title_slide_layout = prs.slide_layouts[0]
         title_slide = prs.slides.add_slide(title_slide_layout)
-        title_placeholder = title_slide.placeholders[0]
-        title_placeholder.text = presentation_title
-        if presentation_subtitle:
-            subtitle_placeholder = title_slide.placeholders[1]
-            subtitle_placeholder.text = presentation_subtitle
         
+        # Añadir título y subtítulo de forma segura
+        title_placeholder = None
+        for placeholder in title_slide.placeholders:
+            if placeholder.is_title:
+                title_placeholder = placeholder
+                break
+        
+        if title_placeholder:
+            title_placeholder.text = presentation_title
+        else:
+            left = top = width = height = Inches(1)
+            txBox = title_slide.shapes.add_textbox(left, top, width, height)
+            tf = txBox.text_frame
+            tf.text = presentation_title
+
+        subtitle_placeholder = None
+        for placeholder in title_slide.placeholders:
+            if placeholder.placeholder_format.idx == 1:
+                subtitle_placeholder = placeholder
+                break
+        
+        if subtitle_placeholder:
+            subtitle_placeholder.text = presentation_subtitle
+        else:
+            left = top = width = height = Inches(1)
+            txBox = title_slide.shapes.add_textbox(left, Inches(2), width, height)
+            tf = txBox.text_frame
+            tf.text = presentation_subtitle
+
         # Diapositivas de contenido (Layout 1)
         content_layout = prs.slide_layouts[1]
         openai_api_key = get_api_key("gpt-3.5-turbo")
 
         for slide_info in slides_data.get("slides", []):
             slide = prs.slides.add_slide(content_layout)
-            slide.shapes.title.text = slide_info.get("title", "")
+            
+            # Añadir título del contenido de forma segura
+            content_title_placeholder = None
+            for placeholder in slide.placeholders:
+                if placeholder.is_title:
+                    content_title_placeholder = placeholder
+                    break
 
-            bullets_text = "\n".join(slide_info.get("bullets", []))
-            body_shape = slide.placeholders[1]
-            body_shape.text = bullets_text
+            if content_title_placeholder:
+                content_title_placeholder.text = slide_info.get("title", "")
+            else:
+                left = top = width = height = Inches(1)
+                txBox = slide.shapes.add_textbox(left, top, width, height)
+                tf = txBox.text_frame
+                tf.text = slide_info.get("title", "")
+            
+            # Añadir viñetas del contenido de forma segura
+            body_shape = None
+            for placeholder in slide.placeholders:
+                if placeholder.placeholder_format.idx == 1:
+                    body_shape = placeholder
+                    break
+            
+            if body_shape:
+                bullets_text = "\n".join(slide_info.get("bullets", []))
+                body_shape.text = bullets_text
+            else:
+                left = top = width = height = Inches(1)
+                txBox = slide.shapes.add_textbox(left, Inches(2), width, height)
+                tf = txBox.text_frame
+                for bullet in slide_info.get("bullets", []):
+                    p = tf.add_paragraph()
+                    p.text = bullet
             
             # Generación y adición de la imagen
             image = None
@@ -189,7 +240,6 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                 image.save(img_stream, format='PNG')
                 img_stream.seek(0)
                 
-                # Coordenadas y tamaño de la imagen ajustadas
                 left_inches = 14 / 2.54
                 top_inches = 7 / 2.54
                 width_inches = 10 / 2.54
@@ -197,7 +247,7 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                 
                 slide.shapes.add_picture(img_stream, Inches(left_inches), Inches(top_inches), width=Inches(width_inches), height=Inches(height_inches))
 
-        # Diapositiva final de "Gracias" (Layout 0)
+        # Diapositiva final de "Gracias"
         final_slide_layout = prs.slide_layouts[0]
         final_slide = prs.slides.add_slide(final_slide_layout)
         left = top = Inches(0)
@@ -353,7 +403,7 @@ with col1:
                         st.info("Paso 4: El esquema de la IA fue generado. Ahora creando el archivo PowerPoint.")
                         prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_model_option, image_size_option, model_text_option)
                         
-                        if prs: # Verificamos si la presentación se creó correctamente
+                        if prs:
                             pptx_file = BytesIO()
                             prs.save(pptx_file)
                             pptx_file.seek(0)
