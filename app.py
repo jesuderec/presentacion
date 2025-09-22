@@ -157,11 +157,14 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
         
         # Añadir título y subtítulo de forma segura
         title_placeholder = None
+        subtitle_placeholder = None
         for placeholder in title_slide.placeholders:
-            if placeholder.is_title:
-                title_placeholder = placeholder
-                break
-        
+            if placeholder.has_text_frame:
+                if placeholder.is_title:
+                    title_placeholder = placeholder
+                elif placeholder.placeholder_format.idx == 1:
+                    subtitle_placeholder = placeholder
+
         if title_placeholder:
             title_placeholder.text = presentation_title
         else:
@@ -170,12 +173,6 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
             tf = txBox.text_frame
             tf.text = presentation_title
 
-        subtitle_placeholder = None
-        for placeholder in title_slide.placeholders:
-            if placeholder.placeholder_format.idx == 1:
-                subtitle_placeholder = placeholder
-                break
-        
         if subtitle_placeholder:
             subtitle_placeholder.text = presentation_subtitle
         else:
@@ -193,10 +190,13 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
             
             # Añadir título del contenido de forma segura
             content_title_placeholder = None
+            body_shape = None
             for placeholder in slide.placeholders:
-                if placeholder.is_title:
-                    content_title_placeholder = placeholder
-                    break
+                if placeholder.has_text_frame:
+                    if placeholder.is_title:
+                        content_title_placeholder = placeholder
+                    elif placeholder.placeholder_format.idx == 1:
+                        body_shape = placeholder
 
             if content_title_placeholder:
                 content_title_placeholder.text = slide_info.get("title", "")
@@ -207,12 +207,6 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                 tf.text = slide_info.get("title", "")
             
             # Añadir viñetas del contenido de forma segura
-            body_shape = None
-            for placeholder in slide.placeholders:
-                if placeholder.placeholder_format.idx == 1:
-                    body_shape = placeholder
-                    break
-            
             if body_shape:
                 bullets_text = "\n".join(slide_info.get("bullets", []))
                 body_shape.text = bullets_text
