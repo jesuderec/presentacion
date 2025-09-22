@@ -69,13 +69,13 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
         elif "gpt" in model_name:
             setup_openai_client(api_key)
             response = openai.chat.completions.create(
-                model="gpt-4o-mini",  # Modelo actualizado
+                model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}]
             )
             ai_response_content = response.choices[0].message.content
         elif "gemini" in model_name:
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel("gemini-1.5-pro") # Modelo actualizado
+            model = genai.GenerativeModel("gemini-1.5-pro")
             response = model.generate_content(prompt)
             ai_response_content = response.text
         
@@ -301,54 +301,63 @@ if 'presentation_data' not in st.session_state:
     st.session_state.presentation_data = None
     st.session_state.narrative_data = None
 
-if st.button("Generar Presentación", disabled=is_button_disabled):
-    text_to_process = ""
-    if uploaded_file is not None:
-        file_extension = uploaded_file.name.split(".")[-1].lower()
-        if file_extension == "txt":
-            text_to_process = read_text_from_txt(uploaded_file)
-        elif file_extension == "docx":
-            text_to_process = read_text_from_docx(uploaded_file)
-        elif file_extension == "pdf":
-            text_to_process = read_text_from_pdf(uploaded_file)
-    elif text_input:
-        text_to_process = text_input
-    
-    if not text_to_process:
-        pass # Se eliminó el mensaje de advertencia
-    else:
-        with st.spinner("Procesando texto y generando presentación..."):
-            
-            selected_ai_key = get_api_key(model_text_option)
-            if not selected_ai_key:
-                pass # Se eliminó el mensaje de error
-            else:
-                slides_data = generate_slides_data_with_ai(text_to_process, num_slides, model_text_option, selected_ai_key)
+col1, col2 = st.columns(2)
+with col1:
+    if st.button("Generar Presentación", disabled=is_button_disabled):
+        text_to_process = ""
+        if uploaded_file is not None:
+            file_extension = uploaded_file.name.split(".")[-1].lower()
+            if file_extension == "txt":
+                text_to_process = read_text_from_txt(uploaded_file)
+            elif file_extension == "docx":
+                text_to_process = read_text_from_docx(uploaded_file)
+            elif file_extension == "pdf":
+                text_to_process = read_text_from_pdf(uploaded_file)
+        elif text_input:
+            text_to_process = text_input
+        
+        if not text_to_process:
+            pass # Se eliminó el mensaje de advertencia
+        else:
+            with st.spinner("Procesando texto y generando presentación..."):
                 
-                if slides_data:
-                    # LÍNEA CORREGIDA
-                    prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_model_option, image_size_option, model_text_option)
+                selected_ai_key = get_api_key(model_text_option)
+                if not selected_ai_key:
+                    pass # Se eliminó el mensaje de error
+                else:
+                    slides_data = generate_slides_data_with_ai(text_to_process, num_slides, model_text_option, selected_ai_key)
                     
-                    pptx_file = BytesIO()
-                    prs.save(pptx_file)
-                    pptx_file.seek(0)
-                    st.session_state.presentation_data = pptx_file
-                    
-                    narrative_full_text = ""
-                    for i, slide in enumerate(slides_data.get("slides", [])):
-                        narrative_full_text += f"Diapositiva {i+1}: {slide['title']}\n\n"
-                        narrative_full_text += f"{slide['narrative']}\n\n"
+                    if slides_data:
+                        prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_model_option, image_size_option, model_text_option)
                         
-                        if "image_description" in slide:
-                            narrative_full_text += f"Descripción de la imagen: {slide['image_description']}\n\n"
-                    
-                    if slides_data.get("references"):
-                        narrative_full_text += "Referencias Bibliográficas:\n"
-                        for ref in slides_data["references"]:
-                            narrative_full_text += f"- {ref}\n"
-                    st.session_state.narrative_data = narrative_full_text.encode('utf-8')
-                    
-                    pass # Se eliminó el mensaje de éxito
+                        pptx_file = BytesIO()
+                        prs.save(pptx_file)
+                        pptx_file.seek(0)
+                        st.session_state.presentation_data = pptx_file
+                        
+                        narrative_full_text = ""
+                        for i, slide in enumerate(slides_data.get("slides", [])):
+                            narrative_full_text += f"Diapositiva {i+1}: {slide['title']}\n\n"
+                            narrative_full_text += f"{slide['narrative']}\n\n"
+                            
+                            if "image_description" in slide:
+                                narrative_full_text += f"Descripción de la imagen: {slide['image_description']}\n\n"
+                        
+                        if slides_data.get("references"):
+                            narrative_full_text += "Referencias Bibliográficas:\n"
+                            for ref in slides_data["references"]:
+                                narrative_full_text += f"- {ref}\n"
+                        st.session_state.narrative_data = narrative_full_text.encode('utf-8')
+                        
+                        pass # Se eliminó el mensaje de éxito
+
+with col2:
+    if st.button("Limpiar"):
+        if 'presentation_data' in st.session_state:
+            del st.session_state.presentation_data
+        if 'narrative_data' in st.session_state:
+            del st.session_state.narrative_data
+        st.rerun()
 
 if st.session_state.presentation_data is not None:
     with st.expander("📝 Narrativa y Referencias para el Presentador"):
