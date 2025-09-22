@@ -14,6 +14,7 @@ from PIL import Image
 import io
 import re
 import openai
+import google.generativeai as genai
 
 # Configuración básica de registro
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -68,19 +69,15 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
         elif "gpt" in model_name:
             setup_openai_client(api_key)
             response = openai.chat.completions.create(
-                model=model_name,
+                model="gpt-4o-mini",  # Modelo actualizado
                 messages=[{"role": "user", "content": prompt}]
             )
             ai_response_content = response.choices[0].message.content
         elif "gemini" in model_name:
-            api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
-            headers['x-goog-api-key'] = api_key
-            payload = {
-                "contents": [{"parts": [{"text": prompt}]}]
-            }
-            response = requests.post(api_url, headers=headers, data=json.dumps(payload))
-            response.raise_for_status()
-            ai_response_content = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel("gemini-1.5-pro") # Modelo actualizado
+            response = model.generate_content(prompt)
+            ai_response_content = response.text
         
         json_start = ai_response_content.find('{')
         json_end = ai_response_content.rfind('}') + 1
@@ -260,7 +257,7 @@ with st.sidebar:
     st.header("🤖 Modelos de IA")
     model_text_option = st.selectbox(
         "Elige la IA para generar el texto:",
-        options=["deepseek-coder", "gpt-3.5-turbo", "gemini-2.0-flash"]
+        options=["deepseek-coder", "gpt-4o-mini", "gemini-1.5-pro"]
     )
     st.header("🖼️ Opciones de Imagen (DALL-E)")
     image_model_option = st.selectbox(
