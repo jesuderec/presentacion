@@ -151,80 +151,71 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
     try:
         template_path = os.path.join("assets", "templates", "UNRC_presentacion.pptx")
         prs = Presentation(template_path)
-        
-        # Diapositiva de título (Layout 0)
-        title_slide_layout = prs.slide_layouts[0]
-        title_slide = prs.slides.add_slide(title_slide_layout)
-        
-        # Añadir título y subtítulo de forma segura
-        title_placeholder = None
-        subtitle_placeholder = None
-        for placeholder in title_slide.placeholders:
-            try:
-                if placeholder.is_title:
-                    title_placeholder = placeholder
-                elif placeholder.placeholder_format.idx == 1:
-                    subtitle_placeholder = placeholder
-            except AttributeError:
-                # Omitir placeholders que no tienen atributos de texto
-                continue
 
+        # --- Búsqueda de diseños por nombre (Más robusto) ---
+        # Diccionario para mapear nombres de layout a su objeto
+        layout_mapping = {layout.name: layout for layout in prs.slide_layouts}
+
+        # Nombres comunes para los diseños (ajusta si tu plantilla usa otros nombres)
+        title_layout_name = "Title Slide"  # O el nombre que corresponda en tu plantilla
+        content_layout_name = "Title and Content" # O el nombre que corresponda
+
+        if title_layout_name not in layout_mapping:
+            st.error(f"Error: No se encontró un diseño con el nombre '{title_layout_name}' en la plantilla.")
+            # Fallback al primer layout si no se encuentra
+            title_slide_layout = prs.slide_layouts[0]
+        else:
+            title_slide_layout = layout_mapping[title_layout_name]
+
+        if content_layout_name not in layout_mapping:
+            st.error(f"Error: No se encontró un diseño con el nombre '{content_layout_name}' en la plantilla.")
+            # Fallback al segundo layout si no se encuentra
+            content_layout = prs.slide_layouts[1]
+        else:
+            content_layout = layout_mapping[content_layout_name]
+        # --- Fin de la búsqueda de diseños ---
+
+        # Diapositiva de título
+        title_slide = prs.slides.add_slide(title_slide_layout)
+
+        # Añadir título y subtítulo de forma segura
+        title_placeholder = title_slide.shapes.title
+        subtitle_placeholder = None
+
+        # Intenta encontrar el subtítulo de manera más específica
+        for shape in title_slide.placeholders:
+            if not shape.is_title:
+                subtitle_placeholder = shape
+                break
+        
         if title_placeholder:
             title_placeholder.text = presentation_title
-        else:
-            left = top = width = height = Inches(1)
-            txBox = title_slide.shapes.add_textbox(left, top, width, height)
-            tf = txBox.text_frame
-            tf.text = presentation_title
 
         if subtitle_placeholder:
             subtitle_placeholder.text = presentation_subtitle
-        else:
-            left = top = width = height = Inches(1)
-            txBox = title_slide.shapes.add_textbox(left, Inches(2), width, height)
-            tf = txBox.text_frame
-            tf.text = presentation_subtitle
 
-        # Diapositivas de contenido (Layout 1)
-        content_layout = prs.slide_layouts[1]
+        # Diapositivas de contenido
         openai_api_key = get_api_key("gpt-3.5-turbo")
 
         for slide_info in slides_data.get("slides", []):
             try:
                 slide = prs.slides.add_slide(content_layout)
                 
-                # Añadir título del contenido de forma segura
-                content_title_placeholder = None
-                body_shape = None
-                for placeholder in slide.placeholders:
-                    try:
-                        if placeholder.is_title:
-                            content_title_placeholder = placeholder
-                        elif placeholder.placeholder_format.idx == 1:
-                            body_shape = placeholder
-                    except AttributeError:
-                        continue
-
-                if content_title_placeholder:
-                    content_title_placeholder.text = slide_info.get("title", "")
-                else:
-                    left = top = width = height = Inches(1)
-                    txBox = slide.shapes.add_textbox(left, top, width, height)
-                    tf = txBox.text_frame
-                    tf.text = slide_info.get("title", "")
+                # Asignar título y contenido
+                if slide.shapes.title:
+                    slide.shapes.title.text = slide_info.get("title", "")
                 
-                # Añadir viñetas del contenido de forma segura
-                if body_shape:
-                    bullets_text = "\n".join(slide_info.get("bullets", []))
-                    body_shape.text = bullets_text
-                else:
-                    left = top = width = height = Inches(1)
-                    txBox = slide.shapes.add_textbox(left, Inches(2), width, height)
-                    tf = txBox.text_frame
-                    for bullet in slide_info.get("bullets", []):
+                if slide.placeholders[1]:
+                    body_shape = slide.placeholders[1]
+                    tf = body_shape.text_frame
+                    tf.clear() # Limpiar texto predeterminado
+                    bullets_text = slide_info.get("bullets", [])
+                    for bullet_point in bullets_text:
                         p = tf.add_paragraph()
-                        p.text = bullet
-                
+                        p.text = bullet_point
+                        p.level = 0
+
+
                 # Generación y adición de la imagen
                 image = None
                 if image_model == "DALL-E":
@@ -243,12 +234,12 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                     image.save(img_stream, format='PNG')
                     img_stream.seek(0)
                     
-                    left_inches = 14 / 2.54
-                    top_inches = 7 / 2.54
-                    width_inches = 10 / 2.54
-                    height_inches = 11 / 2.54
+                    # Posición y tamaño de la imagen (ajusta según necesites)
+                    left_inches = Inches(7.5)
+                    top_inches = Inches(2)
+                    width_inches = Inches(5)
                     
-                    slide.shapes.add_picture(img_stream, Inches(left_inches), Inches(top_inches), width=Inches(width_inches), height=Inches(height_inches))
+                    slide.shapes.add_picture(img_stream, left_inches, top_inches, width=width_inches)
             
             except Exception as e:
                 logging.error(f"Error al procesar la diapositiva: {e}")
@@ -256,18 +247,19 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                 continue
 
 
-        # Diapositiva final de "Gracias"
-        final_slide_layout = prs.slide_layouts[0]
-        final_slide = prs.slides.add_slide(final_slide_layout)
-        left = top = Inches(0)
-        width = prs.slide_width
-        height = prs.slide_height
-        textbox = final_slide.shapes.add_textbox(left, top, width, height)
-        tf = textbox.text_frame
-        tf.text = "¡Gracias!"
-        tf.paragraphs[0].font.size = Pt(72)
-        tf.paragraphs[0].alignment = PP_ALIGN.CENTER
-        tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+        # Diapositiva final de "Gracias" (Usando el diseño de título)
+        final_slide = prs.slides.add_slide(title_slide_layout)
+        if final_slide.shapes.title:
+            title = final_slide.shapes.title
+            title.text = "¡Gracias!"
+            # Centrar texto
+            title.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+            
+            # Limpiar subtítulo si existe
+            for shape in final_slide.placeholders:
+                if not shape.is_title:
+                    shape.text = ""
+
 
         return prs
 
