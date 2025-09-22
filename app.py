@@ -22,7 +22,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # --- Configuración de la API ---
 def get_api_key(model_name):
-    # CORRECCIÓN: Usar os.getenv para obtener las claves de las variables de entorno
     if model_name == "deepseek-chat":
         return os.getenv("DEEPSEEK_API_KEY")
     elif "gpt" in model_name:
@@ -36,7 +35,14 @@ def setup_openai_client(api_key):
 
 # --- Optimización de texto ---
 def optimize_text_for_ai(text_content):
-    optimized_text = re.sub(r'\s+', ' ', text_content).strip()
+    """
+    Mejora el texto de entrada para evitar errores de la IA.
+    Elimina caracteres no deseados y normaliza espacios.
+    """
+    # Eliminar caracteres no alfanuméricos, excepto puntos, comas, signos de interrogación y exclamación
+    cleaned_text = re.sub(r'[^\w\s.,?!¡¿]', '', text_content, flags=re.UNICODE)
+    # Reemplazar múltiples espacios en blanco, saltos de línea y tabulaciones con un solo espacio
+    optimized_text = re.sub(r'\s+', ' ', cleaned_text).strip()
     return optimized_text
 
 # --- Generación de slides con la IA seleccionada ---
