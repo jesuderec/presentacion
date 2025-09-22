@@ -87,7 +87,7 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
         clean_json = ai_response_content[json_start:json_end]
         return json.loads(clean_json)
     except Exception as e:
-        st.error(f"Error al procesar con la IA de texto: {e}")
+        logging.error(f"Error al procesar con la IA de texto: {e}")
         return None
 
 # --- Generación de imágenes con IA ---
@@ -107,7 +107,7 @@ def generate_image_with_ai(prompt, model_name, size, api_key):
             image_response.raise_for_status()
             return Image.open(io.BytesIO(image_response.content))
         except Exception as e:
-            st.error(f"Error al generar imagen con DALL-E: {e}")
+            logging.error(f"Error al generar imagen con DALL-E: {e}")
             return None
     
     # Placeholder de fallback
@@ -115,7 +115,7 @@ def generate_image_with_ai(prompt, model_name, size, api_key):
         image_path = "assets/images/placeholder.png"
         return Image.open(image_path)
     except FileNotFoundError:
-        st.error(f"Error: No se encontró el archivo de imagen en la ruta: {image_path}. Asegúrate de subirlo a tu repositorio.")
+        logging.error(f"Error: No se encontró el archivo de imagen en la ruta: {image_path}.")
         return None
 
 # --- Funciones para crear presentación ---
@@ -194,7 +194,7 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                     prompt_imagen = f"Imagen minimalista para presentación educativa sobre {slide_info.get('title', '')}"
                     image = generate_image_with_ai(prompt_imagen, model_name=image_model, size=image_size, api_key=openai_api_key)
                 else:
-                    st.error("La clave de API de OpenAI no está configurada. No se pueden generar imágenes con DALL-E.")
+                    logging.error("La clave de API de OpenAI no está configurada.")
             else:
                 image = generate_image_with_ai(None, model_name="Placeholder", size=None, api_key=None)
 
@@ -211,7 +211,7 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                 slide.shapes.add_picture(img_stream, Inches(left_inches), Inches(top_inches), width=Inches(width_inches), height=Inches(height_inches))
 
         except IndexError:
-            st.error(f"Error: La plantilla no tiene el layout de diapositiva {content_layout_index}. Usando un layout predeterminado.")
+            logging.error(f"Error: La plantilla no tiene el layout de diapositiva {content_layout_index}. Usando un layout predeterminado.")
             fallback_layout = prs.slide_layouts[1]
             slide = prs.slides.add_slide(fallback_layout)
             slide.shapes.title.text = slide_info["title"]
@@ -254,6 +254,24 @@ st.title("Generador de Presentaciones 🤖✨🖼️")
 st.markdown("Crea una presentación y su guion a partir de tu texto o archivo.")
 st.markdown("---")
 
+# Controles en la barra lateral
+with st.sidebar:
+    st.header("⚙️ Configuración")
+    st.header("🤖 Modelos de IA")
+    model_text_option = st.selectbox(
+        "Elige la IA para generar el texto:",
+        options=["deepseek-coder", "gpt-3.5-turbo", "gemini-2.0-flash"]
+    )
+    st.header("🖼️ Opciones de Imagen (DALL-E)")
+    image_model_option = st.selectbox(
+        "Elige la IA para generar imágenes:",
+        options=["DALL-E", "Placeholder"]
+    )
+    image_size_option = st.selectbox(
+        "Elige la resolución de las imágenes (DALL-E):",
+        options=["1024x1024", "1792x1024", "1024x1792"]
+    )
+
 # Controles en el cuerpo principal
 st.header("📄 Detalles de la Presentación")
 presentation_title = st.text_input("Título de la presentación:", value="")
@@ -278,23 +296,6 @@ text_input = st.text_area(
     placeholder="Ej. El ciclo del agua es el proceso de...\n..."
 )
 
-st.header("🤖 Modelos de IA")
-model_text_option = st.selectbox(
-    "Elige la IA para generar el texto:",
-    options=["deepseek-coder", "gpt-3.5-turbo", "gemini-2.0-flash"]
-)
-
-st.header("🖼️ Opciones de Imagen (DALL-E)")
-image_model_option = st.selectbox(
-    "Elige la IA para generar imágenes:",
-    options=["DALL-E", "Placeholder"]
-)
-
-image_size_option = st.selectbox(
-    "Elige la resolución de las imágenes (DALL-E):",
-    options=["1024x1024", "1792x1024", "1024x1792"]
-)
-
 is_title_provided = bool(presentation_title.strip())
 is_content_provided = (uploaded_file is not None) or (bool(text_input.strip()))
 is_button_disabled = not (is_title_provided and is_content_provided)
@@ -317,39 +318,39 @@ if st.button("Generar Presentación", disabled=is_button_disabled):
         text_to_process = text_input
     
     if not text_to_process:
-        st.warning("Por favor, introduce un texto o sube un archivo para generar la presentación.")
+        pass # Se eliminó el mensaje de advertencia
     else:
         with st.spinner("Procesando texto y generando presentación..."):
             
             selected_ai_key = get_api_key(model_text_option)
             if not selected_ai_key:
-                st.error("No se encontró la clave de API para el modelo seleccionado. Por favor, configura tus secretos.")
-                st.stop()
-            slides_data = generate_slides_data_with_ai(text_to_process, num_slides, model_text_option, selected_ai_key)
-            
-            if slides_data:
-                prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_size_option, image_model_option)
+                pass # Se eliminó el mensaje de error
+            else:
+                slides_data = generate_slides_data_with_ai(text_to_process, num_slides, model_text_option, selected_ai_key)
                 
-                pptx_file = BytesIO()
-                prs.save(pptx_file)
-                pptx_file.seek(0)
-                st.session_state.presentation_data = pptx_file
-                
-                narrative_full_text = ""
-                for i, slide in enumerate(slides_data.get("slides", [])):
-                    narrative_full_text += f"Diapositiva {i+1}: {slide['title']}\n\n"
-                    narrative_full_text += f"{slide['narrative']}\n\n"
+                if slides_data:
+                    prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_size_option, image_model_option)
                     
-                    if "image_description" in slide:
-                        narrative_full_text += f"Descripción de la imagen: {slide['image_description']}\n\n"
-                
-                if slides_data.get("references"):
-                    narrative_full_text += "Referencias Bibliográficas:\n"
-                    for ref in slides_data["references"]:
-                        narrative_full_text += f"- {ref}\n"
-                st.session_state.narrative_data = narrative_full_text.encode('utf-8')
-                
-                st.success("¡Presentación y narrativa generadas con éxito!")
+                    pptx_file = BytesIO()
+                    prs.save(pptx_file)
+                    pptx_file.seek(0)
+                    st.session_state.presentation_data = pptx_file
+                    
+                    narrative_full_text = ""
+                    for i, slide in enumerate(slides_data.get("slides", [])):
+                        narrative_full_text += f"Diapositiva {i+1}: {slide['title']}\n\n"
+                        narrative_full_text += f"{slide['narrative']}\n\n"
+                        
+                        if "image_description" in slide:
+                            narrative_full_text += f"Descripción de la imagen: {slide['image_description']}\n\n"
+                    
+                    if slides_data.get("references"):
+                        narrative_full_text += "Referencias Bibliográficas:\n"
+                        for ref in slides_data["references"]:
+                            narrative_full_text += f"- {ref}\n"
+                    st.session_state.narrative_data = narrative_full_text.encode('utf-8')
+                    
+                    pass # Se eliminó el mensaje de éxito
 
 if st.session_state.presentation_data is not None:
     with st.expander("📝 Narrativa y Referencias para el Presentador"):
@@ -370,4 +371,3 @@ if st.session_state.presentation_data is not None:
             file_name="narrativa_presentacion.txt",
             mime="text/plain"
         )
-        
