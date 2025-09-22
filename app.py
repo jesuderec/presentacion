@@ -15,6 +15,10 @@ import io
 import re
 import openai
 
+# Configuración básica de registro
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+
 # --- Configuración de la API ---
 def get_api_key(model_name):
     if model_name == "deepseek-coder":
@@ -115,7 +119,7 @@ def generate_image_with_ai(prompt, model_name, size, api_key):
         return None
 
 # --- Funciones para crear presentación ---
-def create_presentation(slides_data, presentation_title, presentation_subtitle, image_model, image_size):
+def create_presentation(slides_data, presentation_title, presentation_subtitle, image_model, image_size, text_model_option):
     prs = Presentation()
     
     # Diapositiva de título
@@ -248,6 +252,7 @@ def read_text_from_docx(uploaded_file):
 # --- Interfaz de Streamlit ---
 st.title("Generador de Presentaciones 🤖✨🖼️")
 st.markdown("Crea una presentación y su guion a partir de tu texto o archivo.")
+st.markdown("---")
 
 # Controles en el cuerpo principal
 st.header("📄 Detalles de la Presentación")
