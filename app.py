@@ -317,13 +317,12 @@ with col1:
             text_to_process = text_input
         
         if not text_to_process:
-            pass # Se eliminó el mensaje de advertencia
+            st.error("No se pudo extraer texto del archivo o no se proporcionó texto. Intenta con un archivo diferente o pega el texto directamente.")
         else:
             with st.spinner("Procesando texto y generando presentación..."):
-                
                 selected_ai_key = get_api_key(model_text_option)
                 if not selected_ai_key:
-                    pass # Se eliminó el mensaje de error
+                    st.error(f"Error: La clave de API para {model_text_option} no está configurada.")
                 else:
                     slides_data = generate_slides_data_with_ai(text_to_process, num_slides, model_text_option, selected_ai_key)
                     
@@ -348,8 +347,7 @@ with col1:
                             for ref in slides_data["references"]:
                                 narrative_full_text += f"- {ref}\n"
                         st.session_state.narrative_data = narrative_full_text.encode('utf-8')
-                        
-                        pass # Se eliminó el mensaje de éxito
+                        st.success("¡Presentación generada con éxito! 🎉")
 
 with col2:
     if st.button("Limpiar"):
