@@ -160,11 +160,14 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
         title_placeholder = None
         subtitle_placeholder = None
         for placeholder in title_slide.placeholders:
-            if placeholder.has_text_frame:
+            try:
                 if placeholder.is_title:
                     title_placeholder = placeholder
                 elif placeholder.placeholder_format.idx == 1:
                     subtitle_placeholder = placeholder
+            except AttributeError:
+                # Omitir placeholders que no tienen atributos de texto
+                continue
 
         if title_placeholder:
             title_placeholder.text = presentation_title
@@ -194,11 +197,13 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                 content_title_placeholder = None
                 body_shape = None
                 for placeholder in slide.placeholders:
-                    if placeholder.has_text_frame:
+                    try:
                         if placeholder.is_title:
                             content_title_placeholder = placeholder
                         elif placeholder.placeholder_format.idx == 1:
                             body_shape = placeholder
+                    except AttributeError:
+                        continue
 
                 if content_title_placeholder:
                     content_title_placeholder.text = slide_info.get("title", "")
@@ -248,7 +253,6 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
             except Exception as e:
                 logging.error(f"Error al procesar la diapositiva: {e}")
                 st.error(f"Error al procesar la diapositiva {slide_info.get('title', '')}. Razón: {e}")
-                # Continúa con la siguiente diapositiva si ocurre un error
                 continue
 
 
