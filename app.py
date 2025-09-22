@@ -85,6 +85,8 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
         return json.loads(clean_json)
     except Exception as e:
         logging.error(f"Error al procesar con la IA de texto: {e}")
+        # AÑADIDO: mostrar error específico para el usuario
+        st.error(f"Error de la IA: No se pudo generar el esquema de presentación. Razón: {e}")
         return None
 
 # --- Generación de imágenes con IA ---
@@ -232,11 +234,9 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
 
 # --- Funciones para leer archivos ---
 def read_text_from_txt(uploaded_file):
-    # CORRECCIÓN: Volver al inicio del archivo
     uploaded_file.seek(0)
     return uploaded_file.read().decode("utf-8")
 def read_text_from_pdf(uploaded_file):
-    # CORRECCIÓN: Volver al inicio del archivo
     uploaded_file.seek(0)
     reader = PdfReader(uploaded_file)
     text = ""
@@ -244,7 +244,6 @@ def read_text_from_pdf(uploaded_file):
         text += page.extract_text()
     return text
 def read_text_from_docx(uploaded_file):
-    # CORRECCIÓN: Volver al inicio del archivo
     uploaded_file.seek(0)
     doc = docx.Document(uploaded_file)
     text = ""
