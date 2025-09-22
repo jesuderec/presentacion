@@ -329,7 +329,8 @@ if st.button("Generar Presentación", disabled=is_button_disabled):
                 slides_data = generate_slides_data_with_ai(text_to_process, num_slides, model_text_option, selected_ai_key)
                 
                 if slides_data:
-                    prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_size_option, image_model_option)
+                    # LÍNEA CORREGIDA
+                    prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_model_option, image_size_option, model_text_option)
                     
                     pptx_file = BytesIO()
                     prs.save(pptx_file)
