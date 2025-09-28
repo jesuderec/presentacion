@@ -107,7 +107,7 @@ def generate_image_with_ai(prompt, model_name, size, api_key):
         return Image.new('RGB', (512, 512), color = 'gray')
 
 # --- Funciones para crear presentación ---
-def create_presentation(slides_data, presentation_title, presentation_subtitle, image_model, image_size, text_model_option):
+def create_presentation(slides_data, presentation_title, presentation_subtitle, image_model, image_size):
     try:
         prs = Presentation()
         color_fondo = RGBColor(82, 0, 41)
@@ -254,7 +254,7 @@ with col1:
                 else:
                     slides_data = generate_slides_data_with_ai(text_to_process, num_slides, model_text_option, selected_ai_key)
                     if slides_data:
-                        prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_model_option, image_size_option, text_model_option)
+                        prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_model_option, image_size_option)
                         if prs:
                             pptx_file = BytesIO()
                             prs.save(pptx_file)
