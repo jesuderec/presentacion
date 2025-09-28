@@ -47,12 +47,14 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
             'Content-Type': 'application/json',
             'Authorization': f'Bearer {api_key}'
         }
+        
         prompt = f"""
-        A partir del siguiente texto, genera un esquema de presentación en formato JSON.
+        A partir del siguiente texto, genera un esquema de presentación en formato JSON con exactamente {num_slides} diapositivas.
         La respuesta DEBE ser un objeto JSON que contenga una clave "slides", y el valor debe ser una lista de objetos.
-        Cada objeto de diapositiva debe tener: "title", "bullets" (una lista), "narrative" y "image_description".
+        Cada objeto de diapositiva debe tener: "title", "bullets" (una lista de puntos clave), "narrative" (un párrafo detallado) y "image_description" (una descripción para una imagen).
         Texto a analizar: "{optimized_text}"
         """
+        
         ai_response_content = ""
         if "deepseek" in model_name:
             api_url = "https://api.deepseek.com/v1/chat/completions"
@@ -252,7 +254,7 @@ with col1:
                 else:
                     slides_data = generate_slides_data_with_ai(text_to_process, num_slides, model_text_option, selected_ai_key)
                     if slides_data:
-                        prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_model_option, image_size_option, model_text_option)
+                        prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_model_option, image_size_option, text_model_option)
                         if prs:
                             pptx_file = BytesIO()
                             prs.save(pptx_file)
