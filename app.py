@@ -217,7 +217,7 @@ with st.sidebar:
 st.header("📄 Detalles de la Presentación")
 presentation_title = st.text_input("Título de la presentación:", "")
 presentation_subtitle = st.text_input("Subtítulo (opcional):", "")
-num_slides = st.slider("Número de diapositivas:", 3, 15, 5)
+num_slides = st.slider("Número de diapositivas:", 3, 25, 5)
 
 st.header("⚙️ Entrada de Contenido")
 uploaded_file = st.file_uploader("Sube un archivo (.txt, .docx, .pdf)", type=["txt", "docx", "pdf"])
