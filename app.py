@@ -44,49 +44,37 @@ def generate_slides_data_with_ai(texto_contenido_principal, texto_estructura_bas
     texto_contenido_principal = optimize_text_for_ai(texto_contenido_principal)
     texto_estructura_base = optimize_text_for_ai(texto_estructura_base)
 
-    prompt = ""
-    # --- LÓGICA DE PROMPT DINÁMICA MEJORADA ---
-    if texto_estructura_base:
-        # Prompt para cuando el usuario SÍ proporciona una estructura
-        prompt = f"""
-        **ROL Y OBJETIVO:**
-        Actúa como un Consultor de Comunicación Senior. Tu tarea es tomar una estructura de títulos predefinida y un documento fuente para desarrollar una presentación de alta calidad, profunda y persuasiva.
+    # --- PROMPT SIMPLIFICADO Y REFORZADO ---
+    prompt = f"""
+    **OBJETIVO:** Crear un esquema detallado en formato JSON para una presentación de PowerPoint.
 
-        **ENTRADAS:**
-        1. **DOCUMENTO_FUENTE_CONTENIDO:** La base de conocimiento. Contenido: "{texto_contenido_principal}"
-        2. **GUÍA DE TÍTULOS:** La estructura que debes seguir. Guía: "{texto_estructura_base}"
+    **CONTEXTO:**
+    - **CONTENIDO PRINCIPAL:** "{texto_contenido_principal}"
+    - **ESTRUCTURA GUÍA (Opcional):** "{texto_estructura_base}"
 
-        **PROCESO Y REGLAS ESTRICTAS:**
-        1. **ESTRUCTURA:** Genera 1 diapositiva de **Introducción**, {num_slides} diapositivas de **Contenido Principal** (basadas en la GUÍA), y 1 de **Conclusión**. TOTAL: {num_slides + 2} diapositivas.
-        2. **CALIDAD Y PROFUNDIDAD DEL CONTENIDO:**
-           - **NO SEAS SUPERFICIAL:** Para cada título, no te limites a extraer la definición. Busca en el documento el "porqué", la "importancia" y las "implicaciones" del concepto.
-           - **NARRATIVA PREMIUM:** El campo "narrative" es CRÍTICO. Debe ser un guion para un presentador experto. Debe conectar ideas, ofrecer insights y explicar el contexto de los puntos clave. Evita repetir literalmente los "bullets". La narrativa debe añadir valor y perspectiva.
-           - **BULLETS DE IMPACTO:** Los "bullets" deben ser concisos, pero potentes. Cada punto debe ser una afirmación o dato clave que genere interés.
-        3. **FORMATO DE SALIDA:** Responde únicamente con un objeto JSON válido con la clave "slides".
-        """
-    else:
-        # Prompt MEJORADO para cuando el usuario NO proporciona una estructura
-        prompt = f"""
-        **ROL Y OBJETIVO:**
-        Actúa como un Analista Experto y Estratega de Contenido. Tu misión es analizar un documento complejo, destilar su esencia, y proponer una estructura de presentación que sea a la vez informativa, lógica y cautivadora.
-
-        **ENTRADA:**
-        1. **DOCUMENTO_FUENTE_CONTENIDO:** Tu única fuente de información. Analízala en su totalidad para identificar la tesis central y los argumentos que la sostienen. Contenido: "{texto_contenido_principal}"
-
-        **PROCESO Y REGLAS ESTRICTAS:**
-        1. **ANÁLISIS PROFUNDO:** No te limites a los encabezados del documento. Tu valor está en identificar la narrativa subyacente. ¿Cuál es el problema que se presenta? ¿Qué soluciones o conceptos se exploran? ¿A qué conclusión se llega? Tu estructura debe contar esta historia.
-        2. **ESTRUCTURA ESTRATÉGICA:** Genera 1 diapositiva de **Introducción** (que establezca el problema o la tesis), {num_slides} diapositivas de **Contenido Principal** (que desarrollen los argumentos clave en un orden lógico), y 1 de **Conclusión** (que resuma los hallazgos y ofrezca una reflexión final). TOTAL: {num_slides + 2} diapositivas.
-        3. **CALIDAD Y PROFUNDIDAD DEL CONTENIDO:**
-           - **NARRATIVA PREMIUM:** El campo "narrative" es tu prioridad. Debe ser un guion para un presentador experto. Debe conectar las ideas entre diapositivas, explicar el "porqué" de los datos y ofrecer insights que no son obvios. No repitas los "bullets", explícalos.
-           - **BULLETS DE IMPACTO:** Los "bullets" deben ser afirmaciones claras y memorables, extraídas de tu análisis profundo.
-        4. **FORMATO DE SALIDA:** Responde únicamente con un objeto JSON válido con la clave "slides".
-        """
+    **INSTRUCCIONES CLAVE:**
+    1. **ANALIZA, NO RESUMAS:** Lee y comprende el **CONTENIDO PRINCIPAL** en su totalidad. Tu tarea es extraer los temas y conceptos más importantes para construir una presentación coherente. No te limites a resumir superficialmente.
+    2. **ESTRUCTURA DE LA PRESENTACIÓN:** Debes generar una lista JSON con {num_slides + 2} diapositivas en total, distribuidas de la siguiente manera:
+       - 1 diapositiva de **Introducción**.
+       - {num_slides} diapositivas de **Contenido Principal**. Si se proporciona una **ESTRUCTURA GUÍA**, basa los títulos de estas diapositivas en ella. Si no, deduce los títulos más lógicos a partir de tu análisis del **CONTENIDO PRINCIPAL**.
+       - 1 diapositiva de **Conclusión**.
+    3. **FORMATO DE SALIDA (MUY IMPORTANTE):**
+       - Tu única respuesta debe ser un objeto JSON válido.
+       - El objeto debe tener una clave raíz llamada "slides".
+       - El valor de "slides" debe ser una lista de los {num_slides + 2} objetos de diapositiva.
+       - No incluyas ` ```json ` ni ningún otro texto fuera del objeto JSON.
+    4. **CONTENIDO DE CADA DIAPOSITIVA (JSON Object):**
+       - **"title":** Un título claro y conciso.
+       - **"bullets":** Una lista de 3 a 5 puntos clave (strings).
+       - **"narrative":** Un párrafo de guion para el presentador, que explique y dé contexto a los puntos clave. Debe ser profundo y profesional.
+       - **"image_description":** Una descripción creativa para una imagen.
+    """
 
     try:
         headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
         ai_response_content = ""
         if "deepseek" in model_name:
-            api_url = "https://api.deepseek.com/v1/chat/completions"
+            api_url = "[https://api.deepseek.com/v1/chat/completions](https://api.deepseek.com/v1/chat/completions)"
             payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.7, "response_format": {"type": "json_object"}}
             response = requests.post(api_url, headers=headers, data=json.dumps(payload))
             response.raise_for_status()
