@@ -39,7 +39,7 @@ def optimize_text_for_ai(text_content):
     optimized_text = re.sub(r'\s+', ' ', cleaned_text).strip()
     return optimized_text
 
-# --- Generación de slides con la IA seleccionada (FUNCIÓN ACTUALIZADA) ---
+# --- Generación de slides con la IA seleccionada ---
 def generate_slides_data_with_ai(texto_contenido_principal, texto_estructura_base, num_slides, model_name, api_key):
     texto_contenido_principal = optimize_text_for_ai(texto_contenido_principal)
     texto_estructura_base = optimize_text_for_ai(texto_estructura_base)
@@ -85,7 +85,6 @@ def generate_slides_data_with_ai(texto_contenido_principal, texto_estructura_bas
     try:
         headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
         ai_response_content = ""
-        # ... (Lógica para llamar a las APIs)
         if "deepseek" in model_name:
             api_url = "https://api.deepseek.com/v1/chat/completions"
             payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.7, "response_format": {"type": "json_object"}}
