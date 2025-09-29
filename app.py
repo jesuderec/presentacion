@@ -141,11 +141,12 @@ def find_layout_by_name(prs, name):
 def create_presentation(slides_data, presentation_title, presentation_subtitle, image_model, image_size, template_file):
     """Crea el archivo .pptx usando la plantilla seleccionada."""
     try:
-        # 1. CONSTRUCCIÓN DE LA RUTA ROBUSTA (Ajuste para entornos de Contenedor/Cloud)
-        # __file__ es la ruta del script actual (app.py). Obtenemos su directorio.
+      # 1. CONSTRUCCIÓN DE LA RUTA ABSOLUTA (Incluyendo la carpeta 'fuera')
+        # Obtenemos el directorio donde se está ejecutando app.py
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        # Creamos la ruta relativa a partir del directorio del script, ignorando el nombre de la carpeta raíz ('presentacion').
-        template_path = os.path.join(script_dir, "assets", "templates", template_file)
+        
+        # --- CAMBIO CLAVE: Añadir 'fuera' a la ruta ---
+        template_path = os.path.join(script_dir, "assets", "templates", "fuera", template_file)
         
         # 2. CARGA DE LA PLANTILLA
         prs = Presentation(template_path)
