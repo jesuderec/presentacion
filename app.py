@@ -41,7 +41,6 @@ def optimize_text_for_ai(text_content):
 
 # --- Generación de slides con la IA seleccionada (FUNCIÓN ACTUALIZADA) ---
 def generate_slides_data_with_ai(texto_contenido_principal, texto_estructura_base, num_slides, model_name, api_key):
-    # Optimiza ambos textos
     texto_contenido_principal = optimize_text_for_ai(texto_contenido_principal)
     texto_estructura_base = optimize_text_for_ai(texto_estructura_base)
 
@@ -51,35 +50,36 @@ def generate_slides_data_with_ai(texto_contenido_principal, texto_estructura_bas
             'Authorization': f'Bearer {api_key}'
         }
         
-        # --- PROMPT MEJORADO INTEGRADO ---
+        # --- PROMPT MEJORADO CON INTRO Y CONCLUSIÓN ---
         prompt = f"""
         **ROL Y OBJETIVO:**
-        Actúa como un asistente experto en diseño de presentaciones y comunicación estratégica. Tu objetivo es transformar los documentos proporcionados en una presentación completa, enriquecida y lista para ser expuesta en formato JSON.
+        Actúa como un asistente experto en diseño de presentaciones. Tu objetivo es transformar los documentos proporcionados en un JSON para una presentación completa.
 
-        **ENTRADAS (Contexto):**
-        1. **DOCUMENTO_FUENTE_CONTENIDO:** Este es el texto principal con toda la información detallada. A partir de aquí extraerás el contenido para cada diapositiva.
-           Contenido: "{texto_contenido_principal}"
-
-        2. **DOCUMENTO_BASE_ESTRUCTURA (Opcional):** Este documento contiene una guía de los títulos o temas que debe seguir la presentación. Si está vacío, debes deducir la estructura del documento fuente.
-           Estructura Guía: "{texto_estructura_base}"
+        **ENTRADAS:**
+        1. **DOCUMENTO_FUENTE_CONTENIDO:** Texto principal con la información detallada. Contenido: "{texto_contenido_principal}"
+        2. **DOCUMENTO_BASE_ESTRUCTURA (Opcional):** Guía de títulos o temas. Estructura Guía: "{texto_estructura_base}"
 
         **PROCESO Y REGLAS ESTRICTAS:**
-        1. **ESTRUCTURA:** Genera exactamente {num_slides} diapositivas. Si se proporciona un DOCUMENTO_BASE_ESTRUCTURA, úsalo como guía para los títulos y el orden. Si no, crea una estructura lógica a partir del DOCUMENTO_FUENTE_CONTENIDO.
+        1. **ESTRUCTURA:** La presentación final debe tener la siguiente composición:
+           - 1 diapositiva de **Introducción**.
+           - {num_slides} diapositivas de **Contenido Principal**.
+           - 1 diapositiva de **Conclusión**.
+           TOTAL: {num_slides + 2} diapositivas en la lista JSON. Usa la ESTRUCTURA GUÍA si se proporciona para las diapositivas de contenido.
 
-        2. **FORMATO DE SALIDA:** La respuesta DEBE ser un único objeto JSON válido. Este objeto debe contener una clave principal llamada "slides", cuyo valor sea una lista de objetos. No incluyas texto antes o después del objeto JSON. No uses markdown como ```json.
+        2. **FORMATO DE SALIDA:** La respuesta DEBE ser un único objeto JSON válido sin markdown. El objeto debe tener una clave "slides" que contenga la lista de {num_slides + 2} objetos de diapositiva.
 
         3. **CONTENIDO DE CADA DIAPOSITIVA:** Cada objeto en la lista "slides" debe contener OBLIGATORIAMENTE las siguientes cuatro claves:
-           - "title": Un título claro y directo para la diapositiva.
-           - "bullets": Una lista de strings. Cada string es un punto clave (bullet point) que resume la información de forma concisa. Deben ser entre 3 y 5 puntos por diapositiva.
-           - "narrative": Un guion para el presentador en un solo párrafo. Debe expandir los puntos clave, añadir contexto y tener un tono profesional y atractivo.
-           - "image_description": Una descripción breve y creativa para una imagen que ilustre el contenido de la diapositiva. Debe ser ideal para un modelo de generación de imágenes como DALL-E.
+           - "title": Un título claro.
+           - "bullets": Una lista de 3 a 5 strings concisos (puntos clave).
+           - "narrative": Un guion para el presentador en un solo párrafo, expandiendo los puntos clave.
+           - "image_description": Una descripción creativa para una imagen, ideal para un modelo de IA.
 
-        4. **TONO Y CALIDAD:** El contenido debe ser coherente, bien redactado y profesional. La narrativa debe ser fluida y servir como un verdadero apoyo para el orador.
+        4. **TONO Y CALIDAD:** El contenido debe ser coherente, profesional y bien redactado.
         """
         
         ai_response_content = ""
         if "deepseek" in model_name:
-            api_url = "[https://api.deepseek.com/v1/chat/completions](https://api.deepseek.com/v1/chat/completions)"
+            api_url = "https://api.deepseek.com/v1/chat/completions"
             payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.7, "response_format": {"type": "json_object"}}
             response = requests.post(api_url, headers=headers, data=json.dumps(payload))
             response.raise_for_status()
@@ -128,7 +128,7 @@ def generate_image_with_ai(prompt, model_name, size, api_key):
     except Exception:
         return Image.new('RGB', (512, 512), color = 'gray')
 
-# --- Funciones para crear presentación ---
+# --- Funciones para crear presentación (FUNCIÓN ACTUALIZADA) ---
 def create_presentation(slides_data, presentation_title, presentation_subtitle, image_model, image_size):
     try:
         prs = Presentation()
@@ -147,6 +147,7 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
         title_slide_layout = prs.slide_layouts[0]
         content_layout = prs.slide_layouts[1]
         
+        # Diapositiva de Título (generada por nosotros)
         slide = prs.slides.add_slide(title_slide_layout)
         title = slide.shapes.title
         subtitle = slide.placeholders[1]
@@ -159,6 +160,7 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
 
         openai_api_key = get_api_key("gpt-4o-mini")
 
+        # Diapositivas de Contenido (generadas por la IA)
         for slide_info in slides_data.get("slides", []):
             try:
                 slide = prs.slides.add_slide(content_layout)
@@ -170,12 +172,23 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                 body_shape = slide.placeholders[1]
                 tf = body_shape.text_frame
                 tf.clear() 
+                
+                # Añadir Bullets
                 for bullet_point in slide_info.get("bullets", []):
                     p = tf.add_paragraph()
                     p.text = bullet_point
                     p.font.color.rgb = color_texto
                     p.font.size = Pt(20)
                     p.level = 0
+                
+                # Añadir la Narrativa a la diapositiva
+                narrative_text = slide_info.get("narrative", "")
+                if narrative_text:
+                    p_narrative = tf.add_paragraph()
+                    p_narrative.text = f"\n{narrative_text}" # Añadir un espacio
+                    p_narrative.font.color.rgb = color_texto
+                    p_narrative.font.size = Pt(14)
+                    p_narrative.font.italic = True
                 
                 prompt_imagen = slide_info.get('image_description', f"Imagen sobre {slide_info.get('title', '')}")
                 image = generate_image_with_ai(prompt_imagen, image_model, image_size, openai_api_key)
@@ -191,6 +204,7 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                 logging.error(f"Error al procesar diapositiva: {e}")
                 continue
 
+        # Diapositiva de "Gracias" (generada por nosotros)
         slide = prs.slides.add_slide(title_slide_layout)
         title = slide.shapes.title
         subtitle = slide.placeholders[1]
@@ -208,7 +222,6 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
 def read_text_from_file(uploaded_file):
     if uploaded_file is None:
         return ""
-    # Asegurarse de que el puntero del archivo está al inicio
     uploaded_file.seek(0)
     file_extension = os.path.splitext(uploaded_file.name)[1].lower()
     if file_extension == ".txt":
@@ -243,21 +256,37 @@ with st.sidebar:
 st.header("📄 Detalles de la Presentación")
 presentation_title = st.text_input("Título de la presentación:", "")
 presentation_subtitle = st.text_input("Subtítulo (opcional):", "")
-num_slides = st.slider("Número de diapositivas:", 3, 25, 5)
+num_slides = st.slider("Número de diapositivas de contenido:", 3, 25, 5)
 
 st.header("⚙️ Entrada de Contenido")
 
-# --- NUEVOS CAMPOS PARA CONTENIDO Y ESTRUCTURA ---
 st.subheader("1. Documento con el Contenido Principal (Obligatorio)")
 uploaded_file_content = st.file_uploader("Sube un archivo (.txt, .docx, .pdf) para el contenido", type=["txt", "docx", "pdf"], key="content_uploader")
 text_input_content = st.text_area("O pega el contenido principal aquí", height=200, key="content_area")
 
 st.subheader("2. Documento con la Estructura (Opcional)")
-st.markdown("Proporciona una lista de títulos o temas para guiar la estructura de la presentación.")
 uploaded_file_structure = st.file_uploader("Sube un archivo (.txt, .docx, .pdf) para la estructura", type=["txt", "docx", "pdf"], key="structure_uploader")
 text_input_structure = st.text_area("O pega la estructura aquí (ej. un título por línea)", height=100, key="structure_area")
 
-# Determinar el contenido y la estructura a procesar
+# --- INSTRUCCIONES PARA EL USUARIO ---
+st.info(
+    """
+    **💡 ¿Cómo usar el documento de estructura?**
+
+    Para obtener los mejores resultados, proporciona un archivo de texto con los **títulos exactos** que deseas para tus diapositivas de contenido, uno por cada línea.
+
+    * **Ejemplo de un buen archivo de estructura:**
+        ```
+        El Desafío Energético Global
+        Avances en Energía Solar Fotovoltaica
+        Innovación en Turbinas Eólicas
+        El Futuro del Hidrógeno Verde
+        ```
+    * La IA generará automáticamente las diapositivas de "Introducción" y "Conclusión".
+    """,
+    icon="💡"
+)
+
 content_to_process = read_text_from_file(uploaded_file_content) if uploaded_file_content else text_input_content
 structure_to_process = read_text_from_file(uploaded_file_structure) if uploaded_file_structure else text_input_structure
 
