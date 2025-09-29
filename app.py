@@ -44,7 +44,7 @@ def generate_slides_data_with_ai(texto_contenido_principal, texto_estructura_bas
     texto_contenido_principal = optimize_text_for_ai(texto_contenido_principal)
     texto_estructura_base = optimize_text_for_ai(texto_estructura_base)
 
-    # --- PROMPT SIMPLIFICADO Y REFORZADO ---
+    # --- PROMPT DIRECTO Y EFECTIVO ---
     prompt = f"""
     **OBJETIVO:** Crear un esquema detallado en formato JSON para una presentación de PowerPoint.
 
