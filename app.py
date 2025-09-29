@@ -45,42 +45,47 @@ def generate_slides_data_with_ai(texto_contenido_principal, texto_estructura_bas
     texto_estructura_base = optimize_text_for_ai(texto_estructura_base)
 
     prompt = ""
-    # --- LÓGICA DE PROMPT DINÁMICA ---
+    # --- LÓGICA DE PROMPT DINÁMICA MEJORADA ---
     if texto_estructura_base:
         # Prompt para cuando el usuario SÍ proporciona una estructura
         prompt = f"""
         **ROL Y OBJETIVO:**
-        Actúa como un Curador de Contenido y Comunicador Experto. Tu misión es tomar la estructura de títulos proporcionada y enriquecerla con la información más relevante y poderosa del documento fuente para crear una presentación excepcional.
+        Actúa como un Consultor de Comunicación Senior. Tu tarea es tomar una estructura de títulos predefinida y un documento fuente para desarrollar una presentación de alta calidad, profunda y persuasiva.
 
         **ENTRADAS:**
-        1. **DOCUMENTO_FUENTE_CONTENIDO:** Tu fuente principal de información. Úsalo para dar profundidad y evidencia a cada diapositiva. Contenido: "{texto_contenido_principal}"
-        2. **GUÍA DE TÍTULOS (Tu Esqueleto):** Los títulos que debes seguir para la estructura de las diapositivas de contenido. Guía: "{texto_estructura_base}"
+        1. **DOCUMENTO_FUENTE_CONTENIDO:** La base de conocimiento. Contenido: "{texto_contenido_principal}"
+        2. **GUÍA DE TÍTULOS:** La estructura que debes seguir. Guía: "{texto_estructura_base}"
 
         **PROCESO Y REGLAS ESTRICTAS:**
-        1. **ESTRUCTURA:** La presentación final debe tener: 1 diapositiva de **Introducción**, {num_slides} diapositivas de **Contenido Principal** (basadas en la GUÍA DE TÍTULOS), y 1 diapositiva de **Conclusión**. TOTAL: {num_slides + 2} diapositivas.
-        2. **CREATIVIDAD DENTRO DE LA ESTRUCTURA:** No te limites a resumir. Para cada título de la guía, busca en el documento fuente los datos más impactantes, ejemplos o argumentos que lo respalden. ¡Dale vida a cada diapositiva!
-        3. **FORMATO DE SALIDA:** Responde únicamente con un objeto JSON válido. El objeto debe tener una clave "slides" que contenga la lista de los {num_slides + 2} objetos de diapositiva.
-        4. **CONTENIDO DE CADA DIAPOSITIVA:** Cada objeto debe tener estas cuatro claves: "title", "bullets" (3-5 puntos clave), "narrative" (un guion atractivo para el presentador) y "image_description" (una descripción creativa para una imagen).
+        1. **ESTRUCTURA:** Genera 1 diapositiva de **Introducción**, {num_slides} diapositivas de **Contenido Principal** (basadas en la GUÍA), y 1 de **Conclusión**. TOTAL: {num_slides + 2} diapositivas.
+        2. **CALIDAD Y PROFUNDIDAD DEL CONTENIDO:**
+           - **NO SEAS SUPERFICIAL:** Para cada título, no te limites a extraer la definición. Busca en el documento el "porqué", la "importancia" y las "implicaciones" del concepto.
+           - **NARRATIVA PREMIUM:** El campo "narrative" es CRÍTICO. Debe ser un guion para un presentador experto. Debe conectar ideas, ofrecer insights y explicar el contexto de los puntos clave. Evita repetir literalmente los "bullets". La narrativa debe añadir valor y perspectiva.
+           - **BULLETS DE IMPACTO:** Los "bullets" deben ser concisos, pero potentes. Cada punto debe ser una afirmación o dato clave que genere interés.
+        3. **FORMATO DE SALIDA:** Responde únicamente con un objeto JSON válido con la clave "slides".
         """
     else:
         # Prompt MEJORADO para cuando el usuario NO proporciona una estructura
         prompt = f"""
         **ROL Y OBJETIVO:**
-        Actúa como un Analista de Contenido Experto y Estratega de Comunicación. Tu misión es realizar un análisis exhaustivo del documento fuente para extraer sus temas centrales y conceptos clave, y luego estructurarlos en una presentación lógica y coherente.
+        Actúa como un Analista Experto y Estratega de Contenido. Tu misión es analizar un documento complejo, destilar su esencia, y proponer una estructura de presentación que sea a la vez informativa, lógica y cautivadora.
 
         **ENTRADA:**
-        1. **DOCUMENTO_FUENTE_CONTENIDO:** Tu única fuente de información. Debes leerlo y comprenderlo en su totalidad antes de proponer una estructura. No te centres solo en ejemplos o casos prácticos; busca los temas teóricos principales. Contenido: "{texto_contenido_principal}"
+        1. **DOCUMENTO_FUENTE_CONTENIDO:** Tu única fuente de información. Analízala en su totalidad para identificar la tesis central y los argumentos que la sostienen. Contenido: "{texto_contenido_principal}"
 
         **PROCESO Y REGLAS ESTRICTAS:**
-        1. **ANÁLISIS COMPLETO:** Tu primera tarea es identificar los **grandes bloques temáticos** del documento (por ejemplo: 'Buscadores', 'Blogs', 'Gestores de Contenido', 'Redes Sociales', etc.). Ignora los ejemplos aislados como el foco principal y céntrate en los conceptos generales.
-        2. **ESTRUCTURA LÓGICA:** A partir de los temas identificados, crea una narrativa que fluya lógicamente. La presentación debe tener: 1 diapositiva de **Introducción** (que presente los temas a tratar), {num_slides} diapositivas de **Contenido Principal** (cada una desarrollando un tema clave que identificaste), y 1 diapositiva de **Conclusión** (que resuma lo aprendido). TOTAL: {num_slides + 2} diapositivas.
-        3. **FORMATO DE SALIDA:** Responde únicamente con un objeto JSON válido. El objeto debe tener una clave "slides" que contenga la lista de los {num_slides + 2} objetos de diapositiva.
-        4. **CONTENIDO DE CADA DIAPOSITIVA:** Cada objeto debe tener estas cuatro claves: "title" (títulos impactantes que reflejen el tema central de la diapositiva), "bullets" (3-5 puntos clave extraídos del análisis), "narrative" (un guion que explique el concepto) y "image_description" (una descripción creativa).
+        1. **ANÁLISIS PROFUNDO:** No te limites a los encabezados del documento. Tu valor está en identificar la narrativa subyacente. ¿Cuál es el problema que se presenta? ¿Qué soluciones o conceptos se exploran? ¿A qué conclusión se llega? Tu estructura debe contar esta historia.
+        2. **ESTRUCTURA ESTRATÉGICA:** Genera 1 diapositiva de **Introducción** (que establezca el problema o la tesis), {num_slides} diapositivas de **Contenido Principal** (que desarrollen los argumentos clave en un orden lógico), y 1 de **Conclusión** (que resuma los hallazgos y ofrezca una reflexión final). TOTAL: {num_slides + 2} diapositivas.
+        3. **CALIDAD Y PROFUNDIDAD DEL CONTENIDO:**
+           - **NARRATIVA PREMIUM:** El campo "narrative" es tu prioridad. Debe ser un guion para un presentador experto. Debe conectar las ideas entre diapositivas, explicar el "porqué" de los datos y ofrecer insights que no son obvios. No repitas los "bullets", explícalos.
+           - **BULLETS DE IMPACTO:** Los "bullets" deben ser afirmaciones claras y memorables, extraídas de tu análisis profundo.
+        4. **FORMATO DE SALIDA:** Responde únicamente con un objeto JSON válido con la clave "slides".
         """
 
     try:
         headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
         ai_response_content = ""
+        # ... (Lógica para llamar a las APIs)
         if "deepseek" in model_name:
             api_url = "https://api.deepseek.com/v1/chat/completions"
             payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.7, "response_format": {"type": "json_object"}}
