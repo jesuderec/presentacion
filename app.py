@@ -39,25 +39,47 @@ def optimize_text_for_ai(text_content):
     optimized_text = re.sub(r'\s+', ' ', cleaned_text).strip()
     return optimized_text
 
-# --- Generación de slides con la IA seleccionada ---
-def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
-    optimized_text = optimize_text_for_ai(text_content)
+# --- Generación de slides con la IA seleccionada (FUNCIÓN ACTUALIZADA) ---
+def generate_slides_data_with_ai(texto_contenido_principal, texto_estructura_base, num_slides, model_name, api_key):
+    # Optimiza ambos textos
+    texto_contenido_principal = optimize_text_for_ai(texto_contenido_principal)
+    texto_estructura_base = optimize_text_for_ai(texto_estructura_base)
+
     try:
         headers = {
             'Content-Type': 'application/json',
             'Authorization': f'Bearer {api_key}'
         }
         
+        # --- PROMPT MEJORADO INTEGRADO ---
         prompt = f"""
-        A partir del siguiente texto, genera un esquema de presentación en formato JSON con exactamente {num_slides} diapositivas.
-        La respuesta DEBE ser un objeto JSON que contenga una clave "slides", y el valor debe ser una lista de objetos.
-        Cada objeto de diapositiva debe tener: "title", "bullets" (una lista de puntos clave), "narrative" (un párrafo detallado) y "image_description" (una descripción para una imagen).
-        Texto a analizar: "{optimized_text}"
+        **ROL Y OBJETIVO:**
+        Actúa como un asistente experto en diseño de presentaciones y comunicación estratégica. Tu objetivo es transformar los documentos proporcionados en una presentación completa, enriquecida y lista para ser expuesta en formato JSON.
+
+        **ENTRADAS (Contexto):**
+        1. **DOCUMENTO_FUENTE_CONTENIDO:** Este es el texto principal con toda la información detallada. A partir de aquí extraerás el contenido para cada diapositiva.
+           Contenido: "{texto_contenido_principal}"
+
+        2. **DOCUMENTO_BASE_ESTRUCTURA (Opcional):** Este documento contiene una guía de los títulos o temas que debe seguir la presentación. Si está vacío, debes deducir la estructura del documento fuente.
+           Estructura Guía: "{texto_estructura_base}"
+
+        **PROCESO Y REGLAS ESTRICTAS:**
+        1. **ESTRUCTURA:** Genera exactamente {num_slides} diapositivas. Si se proporciona un DOCUMENTO_BASE_ESTRUCTURA, úsalo como guía para los títulos y el orden. Si no, crea una estructura lógica a partir del DOCUMENTO_FUENTE_CONTENIDO.
+
+        2. **FORMATO DE SALIDA:** La respuesta DEBE ser un único objeto JSON válido. Este objeto debe contener una clave principal llamada "slides", cuyo valor sea una lista de objetos. No incluyas texto antes o después del objeto JSON. No uses markdown como ```json.
+
+        3. **CONTENIDO DE CADA DIAPOSITIVA:** Cada objeto en la lista "slides" debe contener OBLIGATORIAMENTE las siguientes cuatro claves:
+           - "title": Un título claro y directo para la diapositiva.
+           - "bullets": Una lista de strings. Cada string es un punto clave (bullet point) que resume la información de forma concisa. Deben ser entre 3 y 5 puntos por diapositiva.
+           - "narrative": Un guion para el presentador en un solo párrafo. Debe expandir los puntos clave, añadir contexto y tener un tono profesional y atractivo.
+           - "image_description": Una descripción breve y creativa para una imagen que ilustre el contenido de la diapositiva. Debe ser ideal para un modelo de generación de imágenes como DALL-E.
+
+        4. **TONO Y CALIDAD:** El contenido debe ser coherente, bien redactado y profesional. La narrativa debe ser fluida y servir como un verdadero apoyo para el orador.
         """
         
         ai_response_content = ""
         if "deepseek" in model_name:
-            api_url = "https://api.deepseek.com/v1/chat/completions"
+            api_url = "[https://api.deepseek.com/v1/chat/completions](https://api.deepseek.com/v1/chat/completions)"
             payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.7, "response_format": {"type": "json_object"}}
             response = requests.post(api_url, headers=headers, data=json.dumps(payload))
             response.raise_for_status()
@@ -183,29 +205,31 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
         return None
 
 # --- Funciones para leer archivos ---
-def read_text_from_txt(uploaded_file):
+def read_text_from_file(uploaded_file):
+    if uploaded_file is None:
+        return ""
+    # Asegurarse de que el puntero del archivo está al inicio
     uploaded_file.seek(0)
-    return uploaded_file.read().decode("utf-8")
+    file_extension = os.path.splitext(uploaded_file.name)[1].lower()
+    if file_extension == ".txt":
+        return uploaded_file.read().decode("utf-8")
+    elif file_extension == ".pdf":
+        reader = PdfReader(uploaded_file)
+        text = ""
+        for page in reader.pages:
+            if page.extract_text():
+                text += page.extract_text()
+        return text
+    elif file_extension == ".docx":
+        doc = docx.Document(uploaded_file)
+        text = ""
+        for paragraph in doc.paragraphs:
+            text += paragraph.text + "\n"
+        return text
+    return ""
 
-def read_text_from_pdf(uploaded_file):
-    uploaded_file.seek(0)
-    reader = PdfReader(uploaded_file)
-    text = ""
-    for page in reader.pages:
-        if page.extract_text():
-            text += page.extract_text()
-    return text
-
-def read_text_from_docx(uploaded_file):
-    uploaded_file.seek(0)
-    doc = docx.Document(uploaded_file)
-    text = ""
-    for paragraph in doc.paragraphs:
-        text += paragraph.text + "\n"
-    return text
-
-# --- Interfaz de Streamlit ---
-st.title("Generador de Presentaciones 🤖✨🖼️")
+# --- Interfaz de Streamlit (UI ACTUALIZADA) ---
+st.title("Generador de Presentaciones Avanzado 🤖✨🖼️")
 st.markdown("Crea una presentación y su guion a partir de tu texto o archivo.")
 st.markdown("---")
 
@@ -214,7 +238,7 @@ with st.sidebar:
     model_text_option = st.selectbox("Elige la IA para generar el texto:", ["gpt-4o-mini", "deepseek-chat", "gemini-1.5-pro"])
     image_model_option = st.selectbox("Elige la IA para generar imágenes:", ["Placeholder", "DALL-E"])
     image_size_option = st.selectbox("Elige la resolución (DALL-E):", ["1024x1024", "1792x1024", "1024x1792"])
-    max_text_length = st.slider("Límite de caracteres para la IA:", 500, 10000, 2000, 100)
+    max_text_length = st.slider("Límite de caracteres para la IA:", 500, 10000, 4000, 100)
 
 st.header("📄 Detalles de la Presentación")
 presentation_title = st.text_input("Título de la presentación:", "")
@@ -222,55 +246,51 @@ presentation_subtitle = st.text_input("Subtítulo (opcional):", "")
 num_slides = st.slider("Número de diapositivas:", 3, 25, 5)
 
 st.header("⚙️ Entrada de Contenido")
-uploaded_file = st.file_uploader("Sube un archivo (.txt, .docx, .pdf)", type=["txt", "docx", "pdf"])
-st.markdown("--- \n O pega tu texto directamente aquí:")
-text_input = st.text_area("Pega tu texto aquí", height=200, placeholder="Ej. El ciclo del agua...")
 
-is_button_disabled = not (bool(presentation_title.strip()) and (bool(uploaded_file) or bool(text_input.strip())))
+# --- NUEVOS CAMPOS PARA CONTENIDO Y ESTRUCTURA ---
+st.subheader("1. Documento con el Contenido Principal (Obligatorio)")
+uploaded_file_content = st.file_uploader("Sube un archivo (.txt, .docx, .pdf) para el contenido", type=["txt", "docx", "pdf"], key="content_uploader")
+text_input_content = st.text_area("O pega el contenido principal aquí", height=200, key="content_area")
 
-text_to_process_view = ""
-if uploaded_file:
-    file_extension = os.path.splitext(uploaded_file.name)[1].lower()
-    read_funcs = {".txt": read_text_from_txt, ".docx": read_text_from_docx, ".pdf": read_text_from_pdf}
-    if file_extension in read_funcs:
-        text_to_process_view = read_funcs[file_extension](uploaded_file)
-elif text_input:
-    text_to_process_view = text_input
+st.subheader("2. Documento con la Estructura (Opcional)")
+st.markdown("Proporciona una lista de títulos o temas para guiar la estructura de la presentación.")
+uploaded_file_structure = st.file_uploader("Sube un archivo (.txt, .docx, .pdf) para la estructura", type=["txt", "docx", "pdf"], key="structure_uploader")
+text_input_structure = st.text_area("O pega la estructura aquí (ej. un título por línea)", height=100, key="structure_area")
 
-if text_to_process_view:
-    with st.expander("🔍 Ver texto extraído"):
-        st.code(text_to_process_view)
+# Determinar el contenido y la estructura a procesar
+content_to_process = read_text_from_file(uploaded_file_content) if uploaded_file_content else text_input_content
+structure_to_process = read_text_from_file(uploaded_file_structure) if uploaded_file_structure else text_input_structure
+
+is_button_disabled = not bool(presentation_title.strip() and content_to_process.strip())
 
 col1, col2 = st.columns(2)
 with col1:
     if st.button("Generar Presentación", disabled=is_button_disabled):
-        text_to_process = text_to_process_view[:max_text_length]
         
-        if text_to_process.strip():
-            with st.spinner("Procesando..."):
-                selected_ai_key = get_api_key(model_text_option)
-                if not selected_ai_key:
-                    st.error(f"La clave de API para {model_text_option} no está configurada.")
-                else:
-                    slides_data = generate_slides_data_with_ai(text_to_process, num_slides, model_text_option, selected_ai_key)
-                    if slides_data:
-                        prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_model_option, image_size_option)
-                        if prs:
-                            pptx_file = BytesIO()
-                            prs.save(pptx_file)
-                            pptx_file.seek(0)
-                            st.session_state.presentation_data = pptx_file
-                            narrative_full_text = ""
-                            for i, slide in enumerate(slides_data.get("slides", [])):
-                                narrative_full_text += f"Diapositiva {i+1}: {slide.get('title', '')}\n\n{slide.get('narrative', '')}\n\nDescripción de imagen: {slide.get('image_description', '')}\n\n---\n\n"
-                            st.session_state.narrative_data = narrative_full_text.encode('utf-8')
-                            st.success("¡Presentación generada con éxito! 🎉")
-                        else:
-                            st.error("No se pudo crear el archivo PowerPoint.")
+        content_truncated = content_to_process[:max_text_length]
+        
+        with st.spinner("Procesando..."):
+            selected_ai_key = get_api_key(model_text_option)
+            if not selected_ai_key:
+                st.error(f"La clave de API para {model_text_option} no está configurada.")
+            else:
+                slides_data = generate_slides_data_with_ai(content_truncated, structure_to_process, num_slides, model_text_option, selected_ai_key)
+                if slides_data:
+                    prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_model_option, image_size_option)
+                    if prs:
+                        pptx_file = BytesIO()
+                        prs.save(pptx_file)
+                        pptx_file.seek(0)
+                        st.session_state.presentation_data = pptx_file
+                        narrative_full_text = ""
+                        for i, slide in enumerate(slides_data.get("slides", [])):
+                            narrative_full_text += f"Diapositiva {i+1}: {slide.get('title', '')}\n\n{slide.get('narrative', '')}\n\nDescripción de imagen: {slide.get('image_description', '')}\n\n---\n\n"
+                        st.session_state.narrative_data = narrative_full_text.encode('utf-8')
+                        st.success("¡Presentación generada con éxito! 🎉")
                     else:
-                        st.error("La IA no pudo generar un esquema válido.")
-        else:
-            st.error("No hay contenido para procesar.")
+                        st.error("No se pudo crear el archivo PowerPoint.")
+                else:
+                    st.error("La IA no pudo generar un esquema válido.")
 
 with col2:
     if st.button("Limpiar"):
