@@ -63,25 +63,24 @@ def generate_slides_data_with_ai(texto_contenido_principal, texto_estructura_bas
         4. **CONTENIDO DE CADA DIAPOSITIVA:** Cada objeto debe tener estas cuatro claves: "title", "bullets" (3-5 puntos clave), "narrative" (un guion atractivo para el presentador) y "image_description" (una descripción creativa para una imagen).
         """
     else:
-        # Prompt para cuando el usuario NO proporciona una estructura
+        # Prompt MEJORADO para cuando el usuario NO proporciona una estructura
         prompt = f"""
         **ROL Y OBJETIVO:**
-        Actúa como un Analista Estratégico y Creador de Narrativas. Tu misión es analizar en profundidad el documento fuente, descubrir su mensaje central y proponer la estructura de presentación más lógica y convincente posible.
+        Actúa como un Analista de Contenido Experto y Estratega de Comunicación. Tu misión es realizar un análisis exhaustivo del documento fuente para extraer sus temas centrales y conceptos clave, y luego estructurarlos en una presentación lógica y coherente.
 
         **ENTRADA:**
-        1. **DOCUMENTO_FUENTE_CONTENIDO:** Tu única fuente de información. Analízala para identificar los temas principales, la secuencia lógica y los puntos de mayor impacto. Contenido: "{texto_contenido_principal}"
+        1. **DOCUMENTO_FUENTE_CONTENIDO:** Tu única fuente de información. Debes leerlo y comprenderlo en su totalidad antes de proponer una estructura. No te centres solo en ejemplos o casos prácticos; busca los temas teóricos principales. Contenido: "{texto_contenido_principal}"
 
         **PROCESO Y REGLAS ESTRICTAS:**
-        1. **ANÁLISIS PROFUNDO:** Antes de escribir, identifica la narrativa principal del documento. ¿Qué historia cuenta? ¿Cuál es el problema, el desarrollo y la solución? Basa tu estructura en esta historia.
-        2. **ESTRUCTURA:** La presentación final debe tener: 1 diapositiva de **Introducción** (que enganche a la audiencia), {num_slides} diapositivas de **Contenido Principal** (que desarrollen tu narrativa), y 1 diapositiva de **Conclusión** (que resuma los puntos clave y llame a la acción). TOTAL: {num_slides + 2} diapositivas.
+        1. **ANÁLISIS COMPLETO:** Tu primera tarea es identificar los **grandes bloques temáticos** del documento (por ejemplo: 'Buscadores', 'Blogs', 'Gestores de Contenido', 'Redes Sociales', etc.). Ignora los ejemplos aislados como el foco principal y céntrate en los conceptos generales.
+        2. **ESTRUCTURA LÓGICA:** A partir de los temas identificados, crea una narrativa que fluya lógicamente. La presentación debe tener: 1 diapositiva de **Introducción** (que presente los temas a tratar), {num_slides} diapositivas de **Contenido Principal** (cada una desarrollando un tema clave que identificaste), y 1 diapositiva de **Conclusión** (que resuma lo aprendido). TOTAL: {num_slides + 2} diapositivas.
         3. **FORMATO DE SALIDA:** Responde únicamente con un objeto JSON válido. El objeto debe tener una clave "slides" que contenga la lista de los {num_slides + 2} objetos de diapositiva.
-        4. **CONTENIDO DE CADA DIAPOSITIVA:** Cada objeto debe tener estas cuatro claves: "title" (títulos que has creado y que son impactantes), "bullets" (3-5 puntos clave), "narrative" (un guion atractivo para el presentador) y "image_description" (una descripción creativa para una imagen).
+        4. **CONTENIDO DE CADA DIAPOSITIVA:** Cada objeto debe tener estas cuatro claves: "title" (títulos impactantes que reflejen el tema central de la diapositiva), "bullets" (3-5 puntos clave extraídos del análisis), "narrative" (un guion que explique el concepto) y "image_description" (una descripción creativa).
         """
 
     try:
         headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
         ai_response_content = ""
-        # ... (Lógica para llamar a las APIs)
         if "deepseek" in model_name:
             api_url = "https://api.deepseek.com/v1/chat/completions"
             payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.7, "response_format": {"type": "json_object"}}
