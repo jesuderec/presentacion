@@ -44,30 +44,33 @@ def generate_slides_data_with_ai(texto_contenido_principal, texto_estructura_bas
     texto_contenido_principal = optimize_text_for_ai(texto_contenido_principal)
     texto_estructura_base = optimize_text_for_ai(texto_estructura_base)
 
-    # --- PROMPT DIRECTO Y EFECTIVO ---
+    # --- PROMPT "CATEDRÁTICO" - MÁS DIRECTO Y EXIGENTE ---
     prompt = f"""
-    **OBJETIVO:** Crear un esquema detallado en formato JSON para una presentación de PowerPoint.
+    **ROL Y OBJETIVO:**
+    Actúa como un **Catedrático Universitario** y diseñador de material didáctico. Tu objetivo es transformar un documento académico en el guion para una **clase magistral**, presentada en formato JSON para PowerPoint. La calidad debe ser impecable, profesional y académicamente rigurosa.
 
     **CONTEXTO:**
-    - **CONTENIDO PRINCIPAL:** "{texto_contenido_principal}"
-    - **ESTRUCTURA GUÍA (Opcional):** "{texto_estructura_base}"
+    - **DOCUMENTO FUENTE:** El material de estudio completo. Contenido: "{texto_contenido_principal}"
+    - **ESTRUCTURA GUÍA (Opcional):** Títulos sugeridos por el usuario. Guía: "{texto_estructura_base}"
 
-    **INSTRUCCIONES CLAVE:**
-    1. **ANALIZA, NO RESUMAS:** Lee y comprende el **CONTENIDO PRINCIPAL** en su totalidad. Tu tarea es extraer los temas y conceptos más importantes para construir una presentación coherente. No te limites a resumir superficialmente.
-    2. **ESTRUCTURA DE LA PRESENTACIÓN:** Debes generar una lista JSON con {num_slides + 2} diapositivas en total, distribuidas de la siguiente manera:
-       - 1 diapositiva de **Introducción**.
-       - {num_slides} diapositivas de **Contenido Principal**. Si se proporciona una **ESTRUCTURA GUÍA**, basa los títulos de estas diapositivas en ella. Si no, deduce los títulos más lógicos a partir de tu análisis del **CONTENIDO PRINCIPAL**.
-       - 1 diapositiva de **Conclusión**.
-    3. **FORMATO DE SALIDA (MUY IMPORTANTE):**
-       - Tu única respuesta debe ser un objeto JSON válido.
-       - El objeto debe tener una clave raíz llamada "slides".
-       - El valor de "slides" debe ser una lista de los {num_slides + 2} objetos de diapositiva.
-       - No incluyas ` ```json ` ni ningún otro texto fuera del objeto JSON.
-    4. **CONTENIDO DE CADA DIAPOSITIVA (JSON Object):**
-       - **"title":** Un título claro y conciso.
-       - **"bullets":** Una lista de 3 a 5 puntos clave (strings).
-       - **"narrative":** Un párrafo de guion para el presentador, que explique y dé contexto a los puntos clave. Debe ser profundo y profesional.
-       - **"image_description":** Una descripción creativa para una imagen.
+    **INSTRUCCIONES CRÍTICAS (DEBES SEGUIRLAS AL PIE DE LA LETRA):**
+
+    1.  **ENFOQUE EN CONCEPTOS, NO EN EJEMPLOS:** El documento fuente contiene conceptos teóricos (Buscadores, Blogs, CMS, Redes Sociales) y puede contener ejemplos prácticos. **TU TAREA ES IGNORAR LOS CASOS PRÁCTICOS COMO TEMA CENTRAL.** La presentación debe tratar sobre los **conceptos generales** del módulo. Los ejemplos solo pueden ser mencionados muy brevemente como una ilustración, si es estrictamente necesario, pero NUNCA deben ser el título ni el tema principal de una diapositiva.
+
+    2.  **ANÁLISIS ACADÉMICO:** Si no se proporciona una ESTRUCTURA GUÍA, debes analizar el documento fuente e identificar los pilares temáticos principales (ej. "Tipos de Buscadores", "Evolución de los Blogs", "Ventajas de los CMS", "Impacto de las Redes Sociales"). Tu estructura debe reflejar una progresión lógica de enseñanza.
+
+    3.  **ESTRUCTURA DE LA PRESENTACIÓN:** Genera una lista JSON con exactamente {num_slides + 2} diapositivas:
+        - 1 diapositiva de **Introducción** (presentando los temas del módulo).
+        - {num_slides} diapositivas de **Contenido Principal**.
+        - 1 diapositiva de **Conclusión** (resumiendo los aprendizajes clave).
+
+    4.  **CALIDAD DEL CONTENIDO DE CADA DIAPOSITIVA:**
+        - **"title":** Títulos académicos y descriptivos.
+        - **"bullets":** Puntos clave que sinteticen las ideas más importantes del tema, no datos superficiales.
+        - **"narrative":** Este es el elemento más importante. Debe ser un párrafo de alta calidad, como si un profesor estuviera explicando el tema. Debe aportar contexto, análisis y explicar el "porqué" de los puntos clave. **No te limites a repetir los bullets.**
+        - **"image_description":** Una descripción profesional y conceptual para una imagen. (ej. "Diagrama de flujo de la arquitectura cliente-servidor en la nube", "Infografía comparando buscadores y metabuscadores").
+
+    5.  **FORMATO DE SALIDA FINAL:** Tu única respuesta debe ser un objeto JSON válido, con una clave raíz "slides", sin ` ```json ` ni texto adicional.
     """
 
     try:
