@@ -137,13 +137,16 @@ def find_layout_by_name(prs, name):
     # Intenta devolver el layout de ContenidoGeneral como fallback
     return prs.slide_layouts[1] if len(prs.slide_layouts) > 1 else prs.slide_layouts[0] 
 
+# --- FUNCIÓN MODIFICADA CON RUTA ABSOLUTA ---
 def create_presentation(slides_data, presentation_title, presentation_subtitle, image_model, image_size, template_file):
     """Crea el archivo .pptx usando la plantilla seleccionada."""
     try:
-        # --- CARGA DINÁMICA DE LA PLANTILLA ---
-        template_path = os.path.join("assets", "templates", template_file)
+        # 1. CONSTRUCCIÓN DE LA RUTA ABSOLUTA (Solución al error FileNotFoundError)
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        template_path = os.path.join(script_dir, "assets", "templates", template_file)
+        
+        # 2. CARGA DE LA PLANTILLA
         prs = Presentation(template_path)
-        # ---------------------------------------
 
         # Diapositivas de Contenido (incluye la portada y el cierre según la IA)
         for slide_info in slides_data.get("slides", []):
@@ -207,11 +210,13 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
         return prs
         
     except FileNotFoundError:
-        logging.error(f"Error: No se encontró el archivo '{template_path}'.")
-        st.error(f"Error de servidor: No se encontró el archivo de plantilla **'{template_file}'**. Asegúrate de que esté en la ruta `assets/templates/`.")
+        # Muestra la ruta exacta que Python intentó usar para depuración
+        logging.error(f"Error: No se encontró el archivo en la ruta: {template_path}")
+        # Muestra un mensaje amigable y útil al usuario en la interfaz
+        st.error(f"¡Error! No se encontró la plantilla **'{template_file}'**. Asegúrate de que esté en la ruta `assets/templates/` dentro de la carpeta de tu proyecto. 🛠️")
         return None
     except Exception as e:
-        logging.error(f"Error al crear la presentación: {e}")
+        logging.error(f"Error general al crear la presentación: {e}")
         return None
 
 # --- Funciones para leer archivos ---
