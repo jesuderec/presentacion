@@ -16,7 +16,7 @@ import re
 import openai
 import google.generativeai as genai
 
-# Configuración básica de registro (no se mostrará en la app)
+# Configuración básica de registro
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
@@ -44,40 +44,44 @@ def generate_slides_data_with_ai(texto_contenido_principal, texto_estructura_bas
     texto_contenido_principal = optimize_text_for_ai(texto_contenido_principal)
     texto_estructura_base = optimize_text_for_ai(texto_estructura_base)
 
-    try:
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {api_key}'
-        }
-        
-        # --- PROMPT MEJORADO CON INTRO Y CONCLUSIÓN ---
+    prompt = ""
+    # --- LÓGICA DE PROMPT DINÁMICA ---
+    if texto_estructura_base:
+        # Prompt para cuando el usuario SÍ proporciona una estructura
         prompt = f"""
         **ROL Y OBJETIVO:**
-        Actúa como un asistente experto en diseño de presentaciones. Tu objetivo es transformar los documentos proporcionados en un JSON para una presentación completa.
+        Actúa como un Curador de Contenido y Comunicador Experto. Tu misión es tomar la estructura de títulos proporcionada y enriquecerla con la información más relevante y poderosa del documento fuente para crear una presentación excepcional.
 
         **ENTRADAS:**
-        1. **DOCUMENTO_FUENTE_CONTENIDO:** Texto principal con la información detallada. Contenido: "{texto_contenido_principal}"
-        2. **DOCUMENTO_BASE_ESTRUCTURA (Opcional):** Guía de títulos o temas. Estructura Guía: "{texto_estructura_base}"
+        1. **DOCUMENTO_FUENTE_CONTENIDO:** Tu fuente principal de información. Úsalo para dar profundidad y evidencia a cada diapositiva. Contenido: "{texto_contenido_principal}"
+        2. **GUÍA DE TÍTULOS (Tu Esqueleto):** Los títulos que debes seguir para la estructura de las diapositivas de contenido. Guía: "{texto_estructura_base}"
 
         **PROCESO Y REGLAS ESTRICTAS:**
-        1. **ESTRUCTURA:** La presentación final debe tener la siguiente composición:
-           - 1 diapositiva de **Introducción**.
-           - {num_slides} diapositivas de **Contenido Principal**.
-           - 1 diapositiva de **Conclusión**.
-           TOTAL: {num_slides + 2} diapositivas en la lista JSON. Usa la ESTRUCTURA GUÍA si se proporciona para las diapositivas de contenido.
-
-        2. **FORMATO DE SALIDA:** La respuesta DEBE ser un único objeto JSON válido sin markdown. El objeto debe tener una clave "slides" que contenga la lista de {num_slides + 2} objetos de diapositiva.
-
-        3. **CONTENIDO DE CADA DIAPOSITIVA:** Cada objeto en la lista "slides" debe contener OBLIGATORIAMENTE las siguientes cuatro claves:
-           - "title": Un título claro.
-           - "bullets": Una lista de 3 a 5 strings concisos (puntos clave).
-           - "narrative": Un guion para el presentador en un solo párrafo, expandiendo los puntos clave.
-           - "image_description": Una descripción creativa para una imagen, ideal para un modelo de IA.
-
-        4. **TONO Y CALIDAD:** El contenido debe ser coherente, profesional y bien redactado.
+        1. **ESTRUCTURA:** La presentación final debe tener: 1 diapositiva de **Introducción**, {num_slides} diapositivas de **Contenido Principal** (basadas en la GUÍA DE TÍTULOS), y 1 diapositiva de **Conclusión**. TOTAL: {num_slides + 2} diapositivas.
+        2. **CREATIVIDAD DENTRO DE LA ESTRUCTURA:** No te limites a resumir. Para cada título de la guía, busca en el documento fuente los datos más impactantes, ejemplos o argumentos que lo respalden. ¡Dale vida a cada diapositiva!
+        3. **FORMATO DE SALIDA:** Responde únicamente con un objeto JSON válido. El objeto debe tener una clave "slides" que contenga la lista de los {num_slides + 2} objetos de diapositiva.
+        4. **CONTENIDO DE CADA DIAPOSITIVA:** Cada objeto debe tener estas cuatro claves: "title", "bullets" (3-5 puntos clave), "narrative" (un guion atractivo para el presentador) y "image_description" (una descripción creativa para una imagen).
         """
-        
+    else:
+        # Prompt para cuando el usuario NO proporciona una estructura
+        prompt = f"""
+        **ROL Y OBJETIVO:**
+        Actúa como un Analista Estratégico y Creador de Narrativas. Tu misión es analizar en profundidad el documento fuente, descubrir su mensaje central y proponer la estructura de presentación más lógica y convincente posible.
+
+        **ENTRADA:**
+        1. **DOCUMENTO_FUENTE_CONTENIDO:** Tu única fuente de información. Analízala para identificar los temas principales, la secuencia lógica y los puntos de mayor impacto. Contenido: "{texto_contenido_principal}"
+
+        **PROCESO Y REGLAS ESTRICTAS:**
+        1. **ANÁLISIS PROFUNDO:** Antes de escribir, identifica la narrativa principal del documento. ¿Qué historia cuenta? ¿Cuál es el problema, el desarrollo y la solución? Basa tu estructura en esta historia.
+        2. **ESTRUCTURA:** La presentación final debe tener: 1 diapositiva de **Introducción** (que enganche a la audiencia), {num_slides} diapositivas de **Contenido Principal** (que desarrollen tu narrativa), y 1 diapositiva de **Conclusión** (que resuma los puntos clave y llame a la acción). TOTAL: {num_slides + 2} diapositivas.
+        3. **FORMATO DE SALIDA:** Responde únicamente con un objeto JSON válido. El objeto debe tener una clave "slides" que contenga la lista de los {num_slides + 2} objetos de diapositiva.
+        4. **CONTENIDO DE CADA DIAPOSITIVA:** Cada objeto debe tener estas cuatro claves: "title" (títulos que has creado y que son impactantes), "bullets" (3-5 puntos clave), "narrative" (un guion atractivo para el presentador) y "image_description" (una descripción creativa para una imagen).
+        """
+
+    try:
+        headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
         ai_response_content = ""
+        # ... (Lógica para llamar a las APIs)
         if "deepseek" in model_name:
             api_url = "https://api.deepseek.com/v1/chat/completions"
             payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.7, "response_format": {"type": "json_object"}}
@@ -128,7 +132,7 @@ def generate_image_with_ai(prompt, model_name, size, api_key):
     except Exception:
         return Image.new('RGB', (512, 512), color = 'gray')
 
-# --- Funciones para crear presentación (FUNCIÓN ACTUALIZADA) ---
+# --- Funciones para crear presentación ---
 def create_presentation(slides_data, presentation_title, presentation_subtitle, image_model, image_size):
     try:
         prs = Presentation()
@@ -147,7 +151,7 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
         title_slide_layout = prs.slide_layouts[0]
         content_layout = prs.slide_layouts[1]
         
-        # Diapositiva de Título (generada por nosotros)
+        # Diapositiva de Título
         slide = prs.slides.add_slide(title_slide_layout)
         title = slide.shapes.title
         subtitle = slide.placeholders[1]
@@ -160,7 +164,7 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
 
         openai_api_key = get_api_key("gpt-4o-mini")
 
-        # Diapositivas de Contenido (generadas por la IA)
+        # Diapositivas de Contenido
         for slide_info in slides_data.get("slides", []):
             try:
                 slide = prs.slides.add_slide(content_layout)
@@ -173,7 +177,6 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                 tf = body_shape.text_frame
                 tf.clear() 
                 
-                # Añadir Bullets
                 for bullet_point in slide_info.get("bullets", []):
                     p = tf.add_paragraph()
                     p.text = bullet_point
@@ -181,11 +184,10 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                     p.font.size = Pt(20)
                     p.level = 0
                 
-                # Añadir la Narrativa a la diapositiva
                 narrative_text = slide_info.get("narrative", "")
                 if narrative_text:
                     p_narrative = tf.add_paragraph()
-                    p_narrative.text = f"\n{narrative_text}" # Añadir un espacio
+                    p_narrative.text = f"\n{narrative_text}"
                     p_narrative.font.color.rgb = color_texto
                     p_narrative.font.size = Pt(14)
                     p_narrative.font.italic = True
@@ -204,7 +206,7 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                 logging.error(f"Error al procesar diapositiva: {e}")
                 continue
 
-        # Diapositiva de "Gracias" (generada por nosotros)
+        # Diapositiva de "Gracias"
         slide = prs.slides.add_slide(title_slide_layout)
         title = slide.shapes.title
         subtitle = slide.placeholders[1]
@@ -241,8 +243,8 @@ def read_text_from_file(uploaded_file):
         return text
     return ""
 
-# --- Interfaz de Streamlit (UI ACTUALIZADA) ---
-st.title("Generador de Presentaciones Avanzado 🤖✨🖼️")
+# --- Interfaz de Streamlit ---
+st.title("Generador de Presentaciones Inteligente 🤖✨🖼️")
 st.markdown("Crea una presentación y su guion a partir de tu texto o archivo.")
 st.markdown("---")
 
@@ -268,12 +270,11 @@ st.subheader("2. Documento con la Estructura (Opcional)")
 uploaded_file_structure = st.file_uploader("Sube un archivo (.txt, .docx, .pdf) para la estructura", type=["txt", "docx", "pdf"], key="structure_uploader")
 text_input_structure = st.text_area("O pega la estructura aquí (ej. un título por línea)", height=100, key="structure_area")
 
-# --- INSTRUCCIONES PARA EL USUARIO ---
 st.info(
     """
     **💡 ¿Cómo usar el documento de estructura?**
 
-    Para obtener los mejores resultados, proporciona un archivo de texto con los **títulos exactos** que deseas para tus diapositivas de contenido, uno por cada línea.
+    Para obtener los mejores resultados, proporciona un archivo con los **títulos exactos** que deseas para tus diapositivas de contenido, uno por cada línea.
 
     * **Ejemplo de un buen archivo de estructura:**
         ```
