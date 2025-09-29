@@ -1,17 +1,19 @@
 import streamlit as st
 import logging
-import os
-import re
-import json
-from io import BytesIO
-import requests
-import docx
-import io
-import openai
 from pptx import Presentation
 from pptx.util import Inches, Pt
+from pptx.enum.text import PP_ALIGN
+from pptx.dml.color import RGBColor
+from io import BytesIO
+import requests
+import json
+import os
+import docx
 from pypdf import PdfReader
 from PIL import Image
+import io
+import re
+import openai
 
 # Configuración básica de registro
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -19,66 +21,60 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # --- Configuración de la API ---
 def get_api_key(model_name):
-    """Obtiene la clave de API desde las variables de entorno."""
     if model_name == "deepseek-chat":
         return os.getenv("DEEPSEEK_API_KEY")
-    elif "gpt" in model_name or model_name == "DALL-E":
+    elif "gpt" in model_name:
         return os.getenv("OPENAI_API_KEY")
     return None
 
 def setup_openai_client(api_key):
-    """Configura el cliente de OpenAI."""
     openai.api_key = api_key
 
 # --- Optimización de texto ---
 def optimize_text_for_ai(text_content):
-    """Limpia y optimiza el texto para enviarlo a la IA."""
     cleaned_text = re.sub(r'[^\w\s.,?!¡¿]', '', text_content, flags=re.UNICODE)
     optimized_text = re.sub(r'\s+', ' ', cleaned_text).strip()
     return optimized_text
 
 # --- Generación de slides con la IA seleccionada ---
 def generate_slides_data_with_ai(texto_contenido_principal, texto_estructura_base, num_slides, model_name, api_key):
-    """Genera el esquema JSON de la presentación usando la IA."""
     texto_contenido_principal = optimize_text_for_ai(texto_contenido_principal)
     texto_estructura_base = optimize_text_for_ai(texto_estructura_base)
 
-    # --- PROMPT "CATEDRÁTICO" CON SELECCIÓN DE LAYOUTS ---
+    # --- PROMPT "CATEDRÁTICO" - MÁS DIRECTO Y EXIGENTE ---
     prompt = f"""
     **ROL Y OBJETIVO:**
-    Actúa como un **Catedrático Universitario** y diseñador de material didáctico. Tu objetivo es transformar un documento académico en el guion para una **clase magistral**, presentada en formato JSON.
+    Actúa como un **Catedrático Universitario** y diseñador de material didáctico. Tu objetivo es transformar un documento académico en el guion para una **clase magistral**, presentada en formato JSON para PowerPoint. La calidad debe ser impecable, profesional y académicamente rigurosa.
 
     **CONTEXTO:**
-    - **DOCUMENTO FUENTE:** Contenido: "{texto_contenido_principal}"
-    - **ESTRUCTURA GUÍA (Opcional):** Guía: "{texto_estructura_base}"
+    - **DOCUMENTO FUENTE:** El material de estudio completo. Contenido: "{texto_contenido_principal}"
+    - **ESTRUCTURA GUÍA (Opcional):** Títulos sugeridos por el usuario. Guía: "{texto_estructura_base}"
 
-    **INSTRUCCIONES CRÍTICAS:**
+    **INSTRUCCIONES CRÍTICAS (DEBES SEGUIRLAS AL PIE DE LA LETRA):**
 
-    1.  **ENFOQUE EN CONCEPTOS, NO EN EJEMPLOS:** Ignora los casos prácticos. Céntrate en los conceptos generales.
+    1.  **ENFOQUE EN CONCEPTOS, NO EN EJEMPLOS:** El documento fuente contiene conceptos teóricos (Buscadores, Blogs, CMS, Redes Sociales) y puede contener ejemplos prácticos. **TU TAREA ES IGNORAR LOS CASOS PRÁCTICOS COMO TEMA CENTRAL.** La presentación debe tratar sobre los **conceptos generales** del módulo. Los ejemplos solo pueden ser mencionados muy brevemente como una ilustración, si es estrictamente necesario, pero NUNCA deben ser el título ni el tema principal de una diapositiva.
 
-    2.  **ANÁLISIS ACADÉMICO:** Si no hay guía, identifica los pilares temáticos principales.
+    2.  **ANÁLISIS ACADÉMICO:** Si no se proporciona una ESTRUCTURA GUÍA, debes analizar el documento fuente e identificar los pilares temáticos principales (ej. "Tipos de Buscadores", "Evolución de los Blogs", "Ventajas de los CMS", "Impacto de las Redes Sociales"). Tu estructura debe reflejar una progresión lógica de enseñanza.
 
-    3.  **ESTRUCTURA DE LA PRESENTACIÓN:** Genera exactamente {num_slides + 2} diapositivas.
+    3.  **ESTRUCTURA DE LA PRESENTACIÓN:** Genera una lista JSON con exactamente {num_slides + 2} diapositivas:
+        - 1 diapositiva de **Introducción** (presentando los temas del módulo).
+        - {num_slides} diapositivas de **Contenido Principal**.
+        - 1 diapositiva de **Conclusión** (resumiendo los aprendizajes clave).
 
     4.  **CALIDAD DEL CONTENIDO DE CADA DIAPOSITIVA:**
-        Para cada diapositiva, genera un objeto JSON con los siguientes campos:
-        - "title": Título académico y descriptivo.
-        - "bullets": Puntos clave importantes.
-        - "narrative": Párrafo de alta calidad que aporte contexto. No repitas los bullets.
-        - "image_description": Descripción profesional para una imagen.
-        - "layout": (CAMBIO IMPORTANTE) Elige el nombre del diseño más apropiado para el contenido de esta diapositiva de la siguiente lista de opciones: ['Portada', 'ContenidoGeneral', 'ContenidoVertical', 'TresObjetos', 'ContenidoSuperior', 'SoloTitulo', 'ContenidoInferior', 'Cierre'].
-            - Usa 'Portada' solo para la primera diapositiva de Introducción.
-            - Usa 'Cierre' solo para la última diapositiva de Conclusión.
-            - Para las demás, elige el que mejor se adapte. 'ContenidoGeneral' es la opción por defecto.
+        - **"title":** Títulos académicos y descriptivos.
+        - **"bullets":** Puntos clave que sinteticen las ideas más importantes del tema, no datos superficiales.
+        - **"narrative":** Este es el elemento más importante. Debe ser un párrafo de alta calidad, como si un profesor estuviera explicando el tema. Debe aportar contexto, análisis y explicar el "porqué" de los puntos clave. **No te limites a repetir los bullets.**
+        - **"image_description":** Una descripción profesional y conceptual para una imagen. (ej. "Diagrama de flujo de la arquitectura cliente-servidor en la nube", "Infografía comparando buscadores y metabuscadores").
 
-    5.  **FORMATO DE SALIDA FINAL:** Tu única respuesta debe ser un objeto JSON válido, con una clave raíz "slides", sin ```json``` ni texto adicional.
+    5.  **FORMATO DE SALIDA FINAL:** Tu única respuesta debe ser un objeto JSON válido, con una clave raíz "slides", sin ` ```json ` ni texto adicional.
     """
 
     try:
         headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
         ai_response_content = ""
         if "deepseek" in model_name:
-            api_url = "https://api.deepseek.com/v1/chat/completions"
+            api_url = "[https://api.deepseek.com/v1/chat/completions](https://api.deepseek.com/v1/chat/completions)"
             payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.7, "response_format": {"type": "json_object"}}
             response = requests.post(api_url, headers=headers, data=json.dumps(payload))
             response.raise_for_status()
@@ -88,7 +84,6 @@ def generate_slides_data_with_ai(texto_contenido_principal, texto_estructura_bas
             response = openai.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}], response_format={"type": "json_object"})
             ai_response_content = response.choices[0].message.content
 
-        # Manejo de casos donde la IA envuelve el JSON con backticks
         match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', ai_response_content)
         clean_json_str = match.group(1) if match else ai_response_content
         
@@ -105,7 +100,6 @@ def generate_slides_data_with_ai(texto_contenido_principal, texto_estructura_bas
 
 # --- Generación de imágenes con IA ---
 def generate_image_with_ai(prompt, model_name, size, api_key):
-    """Genera una imagen con DALL-E o devuelve un placeholder."""
     if model_name == "DALL-E" and api_key:
         setup_openai_client(api_key)
         try:
@@ -117,9 +111,7 @@ def generate_image_with_ai(prompt, model_name, size, api_key):
         except Exception as e:
             logging.warning(f"Error al generar imagen con DALL-E: {e}")
     
-    # Placeholder si DALL-E falla o no está seleccionado
     try:
-        # Aquí puedes usar tu propia imagen de placeholder si tienes una en assets/images/
         script_dir = os.path.dirname(os.path.abspath(__file__))
         placeholder_path = os.path.join(script_dir, "assets", "images", "placeholder.png")
         return Image.open(placeholder_path)
@@ -127,104 +119,95 @@ def generate_image_with_ai(prompt, model_name, size, api_key):
         return Image.new('RGB', (512, 512), color = 'gray')
 
 # --- Funciones para crear presentación ---
-def find_layout_by_name(prs, name):
-    """Busca un layout de diapositiva por su nombre."""
-    for i, layout in enumerate(prs.slide_layouts):
-        if layout.name == name:
-            return prs.slide_layouts[i]
-    
-    logging.warning(f"Layout '{name}' no encontrado. Usando layout por defecto.")
-    # Intenta devolver el layout de ContenidoGeneral como fallback
-    return prs.slide_layouts[1] if len(prs.slide_layouts) > 1 else prs.slide_layouts[0] 
-
-# --- FUNCIÓN MODIFICADA CON RUTA ABSOLUTA ---
-def create_presentation(slides_data, presentation_title, presentation_subtitle, image_model, image_size, template_file):
-    """Crea el archivo .pptx usando la plantilla seleccionada."""
+def create_presentation(slides_data, presentation_title, presentation_subtitle, image_model, image_size):
     try:
-      # 1. CONSTRUCCIÓN DE LA RUTA ABSOLUTA (Incluyendo la carpeta 'fuera')
-        # Obtenemos el directorio donde se está ejecutando app.py
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        # --- CAMBIO CLAVE: Añadir 'fuera' a la ruta ---
-        template_path = os.path.join(script_dir, "assets", "templates", "fuera", template_file)
-        
-        # 2. CARGA DE LA PLANTILLA
-        prs = Presentation(template_path)
+        prs = Presentation()
+        color_fondo = RGBColor(82, 0, 41)
+        color_texto = RGBColor(255, 255, 255)
 
-        # Diapositivas de Contenido (incluye la portada y el cierre según la IA)
+        master = prs.slide_masters[0]
+        fill = master.background.fill
+        fill.solid()
+        fill.fore_color.rgb = color_fondo
+
+        for shape in master.shapes:
+            if shape.has_text_frame and "title" in shape.name.lower():
+                    shape.text_frame.paragraphs[0].font.color.rgb = color_texto
+
+        title_slide_layout = prs.slide_layouts[0]
+        content_layout = prs.slide_layouts[1]
+        
+        # Diapositiva de Título
+        slide = prs.slides.add_slide(title_slide_layout)
+        title = slide.shapes.title
+        subtitle = slide.placeholders[1]
+        title.text = presentation_title
+        subtitle.text = presentation_subtitle
+        title.text_frame.paragraphs[0].font.color.rgb = color_texto
+        subtitle.text_frame.paragraphs[0].font.color.rgb = color_texto
+        title.text_frame.paragraphs[0].font.size = Pt(44)
+        subtitle.text_frame.paragraphs[0].font.size = Pt(28)
+
+        openai_api_key = get_api_key("gpt-4o-mini")
+
+        # Diapositivas de Contenido
         for slide_info in slides_data.get("slides", []):
             try:
-                layout_name = slide_info.get("layout", "ContenidoGeneral")
-                selected_layout = find_layout_by_name(prs, layout_name)
-                slide = prs.slides.add_slide(selected_layout)
-                
-                # Rellenar título
-                if slide.shapes.title:
-                    slide.shapes.title.text = slide_info.get("title", "")
-                
-                # Para la portada, se asigna el subtítulo del usuario
-                if layout_name == "Portada" and len(slide.placeholders) > 1:
-                     slide.placeholders[1].text = presentation_subtitle
+                slide = prs.slides.add_slide(content_layout)
+                title_shape = slide.shapes.title
+                title_shape.text = slide_info.get("title", "")
+                title_shape.text_frame.paragraphs[0].font.color.rgb = color_texto
+                title_shape.text_frame.paragraphs[0].font.size = Pt(32)
 
-                # Buscar placeholder de cuerpo para rellenar bullets y narrativa
-                body_placeholder = None
-                for shape in slide.placeholders:
-                    if shape.placeholder_format.type in ('BODY', 'OBJECT'):
-                        body_placeholder = shape
-                        break
+                body_shape = slide.placeholders[1]
+                tf = body_shape.text_frame
+                tf.clear() 
                 
-                if body_placeholder:
-                    tf = body_placeholder.text_frame
-                    tf.clear()
-                    tf.word_wrap = True
-                    
-                    # Añadir viñetas
-                    for bullet_point in slide_info.get("bullets", []):
-                        p = tf.add_paragraph()
-                        p.text = bullet_point
-                        p.level = 0
-                    
-                    # Añadir narrativa (con estilo específico para diferenciarla)
-                    narrative_text = slide_info.get("narrative", "")
-                    if narrative_text:
-                        p_narrative = tf.add_paragraph()
-                        p_narrative.text = f"\n{narrative_text}"
-                        p_narrative.font.size = Pt(14)
-                        p_narrative.font.italic = True
+                for bullet_point in slide_info.get("bullets", []):
+                    p = tf.add_paragraph()
+                    p.text = bullet_point
+                    p.font.color.rgb = color_texto
+                    p.font.size = Pt(20)
+                    p.level = 0
                 
-                # Generar y añadir imagen si hay descripción
-                prompt_imagen = slide_info.get('image_description')
-                if prompt_imagen:
-                    openai_api_key = get_api_key("gpt-4o-mini")
-                    image = generate_image_with_ai(prompt_imagen, image_model, image_size, openai_api_key)
-                    if image:
-                        img_stream = io.BytesIO()
-                        image.save(img_stream, format='PNG')
-                        img_stream.seek(0)
-                        
-                        # Posición de imagen estática (puede necesitar ajuste por layout)
-                        left, top, width = Inches(6.2), Inches(2.5), Inches(3.5) 
-                        slide.shapes.add_picture(img_stream, left, top, width=width)
+                narrative_text = slide_info.get("narrative", "")
+                if narrative_text:
+                    p_narrative = tf.add_paragraph()
+                    p_narrative.text = f"\n{narrative_text}"
+                    p_narrative.font.color.rgb = color_texto
+                    p_narrative.font.size = Pt(14)
+                    p_narrative.font.italic = True
+                
+                prompt_imagen = slide_info.get('image_description', f"Imagen sobre {slide_info.get('title', '')}")
+                image = generate_image_with_ai(prompt_imagen, image_model, image_size, openai_api_key)
+
+                if image:
+                    img_stream = io.BytesIO()
+                    image.save(img_stream, format='PNG')
+                    img_stream.seek(0)
+                    left, top, width = Inches(6.2), Inches(2.5), Inches(3.5)
+                    slide.shapes.add_picture(img_stream, left, top, width=width)
             
             except Exception as e:
                 logging.error(f"Error al procesar diapositiva: {e}")
                 continue
 
+        # Diapositiva de "Gracias"
+        slide = prs.slides.add_slide(title_slide_layout)
+        title = slide.shapes.title
+        subtitle = slide.placeholders[1]
+        title.text = "¡Gracias!"
+        subtitle.text = ""
+        title.text_frame.paragraphs[0].font.color.rgb = color_texto
+        title.text_frame.paragraphs[0].font.size = Pt(60)
+
         return prs
-        
-    except FileNotFoundError:
-        # Muestra la ruta exacta que Python intentó usar para depuración
-        logging.error(f"Error: No se encontró el archivo en la ruta: {template_path}")
-        # Muestra un mensaje amigable y útil al usuario en la interfaz
-        st.error(f"¡Error! No se encontró la plantilla **'{template_file}'**. Asegúrate de que esté en la ruta `assets/templates/` dentro de la carpeta de tu proyecto. 🛠️")
-        return None
     except Exception as e:
-        logging.error(f"Error general al crear la presentación: {e}")
+        logging.error(f"Error al crear la presentación: {e}")
         return None
 
 # --- Funciones para leer archivos ---
 def read_text_from_file(uploaded_file):
-    """Extrae texto de archivos .txt, .pdf o .docx."""
     if uploaded_file is None:
         return ""
     uploaded_file.seek(0)
@@ -253,12 +236,6 @@ st.markdown("---")
 
 with st.sidebar:
     st.header("⚙️ Configuración")
-    
-    # --- SELECTOR DE PLANTILLA (NUEVO) ---
-    template_file = st.selectbox("Elige la Plantilla de Diseño:", 
-                                ["plantilla.pptx", "plantilla_python.pptx"])
-    # --------------------------------------
-    
     model_text_option = st.selectbox("Elige la IA para generar el texto:", ["gpt-4o-mini", "deepseek-chat"])
     image_model_option = st.selectbox("Elige la IA para generar imágenes:", ["Placeholder", "DALL-E"])
     image_size_option = st.selectbox("Elige la resolución (DALL-E):", ["1024x1024", "1792x1024", "1024x1792"])
@@ -315,9 +292,7 @@ with col1:
             else:
                 slides_data = generate_slides_data_with_ai(content_truncated, structure_to_process, num_slides, model_text_option, selected_ai_key)
                 if slides_data:
-                    # --- LLAMADA MODIFICADA CON template_file ---
-                    prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_model_option, image_size_option, template_file)
-                    # --------------------------------------------
+                    prs = create_presentation(slides_data, presentation_title, presentation_subtitle, image_model_option, image_size_option)
                     if prs:
                         pptx_file = BytesIO()
                         prs.save(pptx_file)
@@ -325,7 +300,7 @@ with col1:
                         st.session_state.presentation_data = pptx_file
                         narrative_full_text = ""
                         for i, slide in enumerate(slides_data.get("slides", [])):
-                            narrative_full_text += f"Diapositiva {i+1}: {slide.get('title', '')}\n\nLayout Seleccionado: {slide.get('layout', 'N/A')}\n\n{slide.get('narrative', '')}\n\nDescripción de imagen: {slide.get('image_description', '')}\n\n---\n\n"
+                            narrative_full_text += f"Diapositiva {i+1}: {slide.get('title', '')}\n\n{slide.get('narrative', '')}\n\nDescripción de imagen: {slide.get('image_description', '')}\n\n---\n\n"
                         st.session_state.narrative_data = narrative_full_text.encode('utf-8')
                         st.success("¡Presentación generada con éxito! 🎉")
                     else:
