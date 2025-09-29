@@ -14,7 +14,6 @@ from PIL import Image
 import io
 import re
 import openai
-import google.generativeai as genai
 
 # Configuración básica de registro
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -26,8 +25,6 @@ def get_api_key(model_name):
         return os.getenv("DEEPSEEK_API_KEY")
     elif "gpt" in model_name:
         return os.getenv("OPENAI_API_KEY")
-    elif "gemini" in model_name:
-        return os.getenv("GEMINI_API_KEY")
     return None
 
 def setup_openai_client(api_key):
@@ -86,11 +83,6 @@ def generate_slides_data_with_ai(texto_contenido_principal, texto_estructura_bas
             setup_openai_client(api_key)
             response = openai.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}], response_format={"type": "json_object"})
             ai_response_content = response.choices[0].message.content
-        elif "gemini" in model_name:
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel("gemini-1.5-pro")
-            response = model.generate_content(prompt)
-            ai_response_content = response.text
 
         match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', ai_response_content)
         clean_json_str = match.group(1) if match else ai_response_content
@@ -140,7 +132,7 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
 
         for shape in master.shapes:
             if shape.has_text_frame and "title" in shape.name.lower():
-                 shape.text_frame.paragraphs[0].font.color.rgb = color_texto
+                    shape.text_frame.paragraphs[0].font.color.rgb = color_texto
 
         title_slide_layout = prs.slide_layouts[0]
         content_layout = prs.slide_layouts[1]
@@ -244,7 +236,7 @@ st.markdown("---")
 
 with st.sidebar:
     st.header("⚙️ Configuración")
-    model_text_option = st.selectbox("Elige la IA para generar el texto:", ["gpt-4o-mini", "deepseek-chat", "gemini-1.5-pro"])
+    model_text_option = st.selectbox("Elige la IA para generar el texto:", ["gpt-4o-mini", "deepseek-chat"])
     image_model_option = st.selectbox("Elige la IA para generar imágenes:", ["Placeholder", "DALL-E"])
     image_size_option = st.selectbox("Elige la resolución (DALL-E):", ["1024x1024", "1792x1024", "1024x1792"])
     max_text_length = st.slider("Límite de caracteres para la IA:", 500, 10000, 4000, 100)
