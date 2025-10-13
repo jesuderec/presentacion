@@ -54,7 +54,7 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
             'Authorization': f'Bearer {api_key}'
         }
         
-        # PROMPT MEJORADO para exigir JSON estricto e incluir image_description
+        # PROMPT MEJORADO: Se exige JSON estricto y se incluye image_description.
         prompt = f"""
         A partir del siguiente texto, genera **SOLO** un objeto JSON sin ningún texto o explicación adicional.
         El objeto JSON debe ser un esquema de presentación con un máximo de {num_slides} diapositivas.
@@ -98,11 +98,13 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
             response = model.generate_content(prompt)
             ai_response_content = response.text
         
-        # LÓGICA DE EXTRACCIÓN Y LIMPIEZA MÁS ROBUSTA
+        # LÓGICA DE EXTRACCIÓN MÁS ROBUSTA Y SIN MANIPULACIÓN AGRESIVA DE STRINGS
+        # 1. Buscar el bloque de código markdown (el formato más limpio)
         clean_json_match = re.search(r'```(?:json)?\s*({.*?})\s*```', ai_response_content, re.DOTALL)
         if clean_json_match:
             clean_json = clean_json_match.group(1)
         else:
+            # 2. Si no es markdown, buscar los primeros y últimos corchetes para aislar el JSON
             json_start = ai_response_content.find('{')
             json_end = ai_response_content.rfind('}') + 1
             if json_start != -1 and json_end != 0:
@@ -111,13 +113,7 @@ def generate_slides_data_with_ai(text_content, num_slides, model_name, api_key):
                 st.error("Error de la IA: La respuesta no contiene un objeto JSON válido.")
                 return None
 
-        # PASO CRÍTICO: Limpiar el string de JSON para errores de terminación
-        # Reemplazar saltos de línea y tabulaciones por sus versiones escapadas
-        clean_json = clean_json.replace('\n', '\\n').replace('\t', '\\t')
-        
-        # Intentar una reparación adicional: remover caracteres de control que no son válidos en JSON
-        clean_json = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', clean_json)
-
+        # Intenta cargar el JSON limpio.
         try:
             return json.loads(clean_json)
         except json.JSONDecodeError as e:
@@ -173,12 +169,11 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
         subtitle_placeholder = None
         for placeholder in title_slide.placeholders:
             try:
-                # Comprobar si es un placeholder de texto (para evitar el error 'is_title' en imágenes)
-                if placeholder.has_text_frame:
-                    if placeholder.is_title:
-                        title_placeholder = placeholder
-                    elif placeholder.placeholder_format.idx == 1:
-                        subtitle_placeholder = placeholder
+                # Usar has_text_frame o is_title para evitar error con PicturePlaceholder
+                if placeholder.has_text_frame and placeholder.is_title:
+                    title_placeholder = placeholder
+                elif placeholder.has_text_frame and placeholder.placeholder_format.idx == 1:
+                    subtitle_placeholder = placeholder
             except AttributeError:
                 continue
 
