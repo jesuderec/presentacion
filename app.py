@@ -75,7 +75,7 @@ def generate_slides_data_with_ai(texto_contenido_principal, texto_estructura_bas
         
         if "deepseek" in model_name:
             # CORRECCIÓN DE URL AQUÍ
-            api_url = "[https://api.deepseek.com/v1/chat/completions](https://api.deepseek.com/v1/chat/completions)"
+            api_url = "https://api.deepseek.com/v1/chat/completions"
             payload = {
                 "model": "deepseek-chat", 
                 "messages": [{"role": "user", "content": prompt}], 
