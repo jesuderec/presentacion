@@ -15,9 +15,8 @@ import io
 import re
 import openai
 
-# Configuración básica de registro
+# --- Configuración básica de registro ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 
 # --- Configuración de la API ---
 def get_api_key(model_name):
@@ -41,7 +40,7 @@ def generate_slides_data_with_ai(texto_contenido_principal, texto_estructura_bas
     texto_contenido_principal = optimize_text_for_ai(texto_contenido_principal)
     texto_estructura_base = optimize_text_for_ai(texto_estructura_base)
 
-    # --- PROMPT "CATEDRÁTICO" - MÁS DIRECTO Y EXIGENTE ---
+    # --- PROMPT "CATEDRÁTICO" ORIGINAL ---
     prompt = f"""
     **ROL Y OBJETIVO:**
     Actúa como un **Catedrático Universitario** y diseñador de material didáctico. Tu objetivo es transformar un documento académico en el guion para una **clase magistral**, presentada en formato JSON para PowerPoint. La calidad debe ser impecable, profesional y académicamente rigurosa.
@@ -52,9 +51,9 @@ def generate_slides_data_with_ai(texto_contenido_principal, texto_estructura_bas
 
     **INSTRUCCIONES CRÍTICAS (DEBES SEGUIRLAS AL PIE DE LA LETRA):**
 
-    1.  **ENFOQUE EN CONCEPTOS, NO EN EJEMPLOS:** El documento fuente contiene conceptos teóricos (Buscadores, Blogs, CMS, Redes Sociales) y puede contener ejemplos prácticos. **TU TAREA ES IGNORAR LOS CASOS PRÁCTICOS COMO TEMA CENTRAL.** La presentación debe tratar sobre los **conceptos generales** del módulo. Los ejemplos solo pueden ser mencionados muy brevemente como una ilustración, si es estrictamente necesario, pero NUNCA deben ser el título ni el tema principal de una diapositiva.
+    1.  **ENFOQUE EN CONCEPTOS, NO EN EJEMPLOS:** El documento fuente contiene conceptos teóricos y puede contener ejemplos prácticos. **TU TAREA ES IGNORAR LOS CASOS PRÁCTICOS COMO TEMA CENTRAL.** La presentación debe tratar sobre los **conceptos generales** del módulo. Los ejemplos solo pueden ser mencionados muy brevemente como una ilustración, si es estrictamente necesario, pero NUNCA deben ser el título ni el tema principal de una diapositiva.
 
-    2.  **ANÁLISIS ACADÉMICO:** Si no se proporciona una ESTRUCTURA GUÍA, debes analizar el documento fuente e identificar los pilares temáticos principales (ej. "Tipos de Buscadores", "Evolución de los Blogs", "Ventajas de los CMS", "Impacto de las Redes Sociales"). Tu estructura debe reflejar una progresión lógica de enseñanza.
+    2.  **ANÁLISIS ACADÉMICO:** Si no se proporciona una ESTRUCTURA GUÍA, debes analizar el documento fuente e identificar los pilares temáticos principales. Tu estructura debe reflejar una progresión lógica de enseñanza.
 
     3.  **ESTRUCTURA DE LA PRESENTACIÓN:** Genera una lista JSON con exactamente {num_slides + 2} diapositivas:
         - 1 diapositiva de **Introducción** (presentando los temas del módulo).
@@ -65,28 +64,35 @@ def generate_slides_data_with_ai(texto_contenido_principal, texto_estructura_bas
         - **"title":** Títulos académicos y descriptivos.
         - **"bullets":** Puntos clave que sinteticen las ideas más importantes del tema, no datos superficiales.
         - **"narrative":** Este es el elemento más importante. Debe ser un párrafo de alta calidad, como si un profesor estuviera explicando el tema. Debe aportar contexto, análisis y explicar el "porqué" de los puntos clave. **No te limites a repetir los bullets.**
-        - **"image_description":** Una descripción profesional y conceptual para una imagen. (ej. "Diagrama de flujo de la arquitectura cliente-servidor en la nube", "Infografía comparando buscadores y metabuscadores").
+        - **"image_description":** Una descripción profesional y conceptual para una imagen.
 
-    5.  **FORMATO DE SALIDA FINAL:** Tu única respuesta debe ser un objeto JSON válido, con una clave raíz "slides", sin ` ```json ` ni texto adicional.
+    5.  **FORMATO DE SALIDA FINAL:** Tu única respuesta debe ser un objeto JSON válido, con una clave raíz "slides", sin ```json ni texto adicional.
     """
 
     try:
         headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
         ai_response_content = ""
+        
         if "deepseek" in model_name:
-           api_url = "https://api.deepseek.com/v1/chat/completions"
-           payload = {
-        "model": "deepseek-chat", 
-        "messages": [{"role": "user", "content": prompt}], 
-        "temperature": 0.7, 
-        "response_format": {"type": "json_object"}
-    }
+            # CORRECCIÓN DE URL AQUÍ
+            api_url = "[https://api.deepseek.com/v1/chat/completions](https://api.deepseek.com/v1/chat/completions)"
+            payload = {
+                "model": "deepseek-chat", 
+                "messages": [{"role": "user", "content": prompt}], 
+                "temperature": 0.7, 
+                "response_format": {"type": "json_object"}
+            }
             response = requests.post(api_url, headers=headers, data=json.dumps(payload))
             response.raise_for_status()
             ai_response_content = response.json()["choices"][0]["message"]["content"]
+            
         elif "gpt" in model_name:
             setup_openai_client(api_key)
-            response = openai.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}], response_format={"type": "json_object"})
+            response = openai.chat.completions.create(
+                model="gpt-4o-mini", 
+                messages=[{"role": "user", "content": prompt}], 
+                response_format={"type": "json_object"}
+            )
             ai_response_content = response.choices[0].message.content
 
         match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', ai_response_content)
@@ -137,12 +143,11 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
 
         for shape in master.shapes:
             if shape.has_text_frame and "title" in shape.name.lower():
-                    shape.text_frame.paragraphs[0].font.color.rgb = color_texto
+                shape.text_frame.paragraphs[0].font.color.rgb = color_texto
 
         title_slide_layout = prs.slide_layouts[0]
         content_layout = prs.slide_layouts[1]
         
-        # Diapositiva de Título
         slide = prs.slides.add_slide(title_slide_layout)
         title = slide.shapes.title
         subtitle = slide.placeholders[1]
@@ -155,7 +160,6 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
 
         openai_api_key = get_api_key("gpt-4o-mini")
 
-        # Diapositivas de Contenido
         for slide_info in slides_data.get("slides", []):
             try:
                 slide = prs.slides.add_slide(content_layout)
@@ -192,12 +196,10 @@ def create_presentation(slides_data, presentation_title, presentation_subtitle, 
                     img_stream.seek(0)
                     left, top, width = Inches(6.2), Inches(2.5), Inches(3.5)
                     slide.shapes.add_picture(img_stream, left, top, width=width)
-            
             except Exception as e:
                 logging.error(f"Error al procesar diapositiva: {e}")
                 continue
 
-        # Diapositiva de "Gracias"
         slide = prs.slides.add_slide(title_slide_layout)
         title = slide.shapes.title
         subtitle = slide.placeholders[1]
@@ -235,7 +237,7 @@ def read_text_from_file(uploaded_file):
     return ""
 
 # --- Interfaz de Streamlit ---
-st.title("Generador de Presentaciones Inteligente 🤖✨🖼️")
+st.title("Generador de Presentaciones Inteligente 🤖✨")
 st.markdown("Crea una presentación y su guion a partir de tu texto o archivo.")
 st.markdown("---")
 
@@ -252,32 +254,11 @@ presentation_subtitle = st.text_input("Subtítulo (opcional):", "")
 num_slides = st.slider("Número de diapositivas de contenido:", 3, 25, 5)
 
 st.header("⚙️ Entrada de Contenido")
+uploaded_file_content = st.file_uploader("Sube un archivo contenido", type=["txt", "docx", "pdf"], key="content_uploader")
+text_input_content = st.text_area("O pega el contenido principal", height=200, key="content_area")
 
-st.subheader("1. Documento con el Contenido Principal (Obligatorio)")
-uploaded_file_content = st.file_uploader("Sube un archivo (.txt, .docx, .pdf) para el contenido", type=["txt", "docx", "pdf"], key="content_uploader")
-text_input_content = st.text_area("O pega el contenido principal aquí", height=200, key="content_area")
-
-st.subheader("2. Documento con la Estructura (Opcional)")
-uploaded_file_structure = st.file_uploader("Sube un archivo (.txt, .docx, .pdf) para la estructura", type=["txt", "docx", "pdf"], key="structure_uploader")
-text_input_structure = st.text_area("O pega la estructura aquí (ej. un título por línea)", height=100, key="structure_area")
-
-st.info(
-    """
-    **💡 ¿Cómo usar el documento de estructura?**
-
-    Para obtener los mejores resultados, proporciona un archivo con los **títulos exactos** que deseas para tus diapositivas de contenido, uno por cada línea.
-
-    * **Ejemplo de un buen archivo de estructura:**
-        ```
-        El Desafío Energético Global
-        Avances en Energía Solar Fotovoltaica
-        Innovación en Turbinas Eólicas
-        El Futuro del Hidrógeno Verde
-        ```
-    * La IA generará automáticamente las diapositivas de "Introducción" y "Conclusión".
-    """,
-    icon="💡"
-)
+uploaded_file_structure = st.file_uploader("Sube un archivo estructura (opcional)", type=["txt", "docx", "pdf"], key="structure_uploader")
+text_input_structure = st.text_area("O pega la estructura aquí", height=100, key="structure_area")
 
 content_to_process = read_text_from_file(uploaded_file_content) if uploaded_file_content else text_input_content
 structure_to_process = read_text_from_file(uploaded_file_structure) if uploaded_file_structure else text_input_structure
@@ -287,13 +268,11 @@ is_button_disabled = not bool(presentation_title.strip() and content_to_process.
 col1, col2 = st.columns(2)
 with col1:
     if st.button("Generar Presentación", disabled=is_button_disabled):
-        
         content_truncated = content_to_process[:max_text_length]
-        
         with st.spinner("Procesando..."):
             selected_ai_key = get_api_key(model_text_option)
             if not selected_ai_key:
-                st.error(f"La clave de API para {model_text_option} no está configurada.")
+                st.error(f"Clave de API no configurada.")
             else:
                 slides_data = generate_slides_data_with_ai(content_truncated, structure_to_process, num_slides, model_text_option, selected_ai_key)
                 if slides_data:
@@ -301,36 +280,26 @@ with col1:
                     if prs:
                         pptx_file = BytesIO()
                         prs.save(pptx_file)
-                        pptx_file.seek(0)
-                        st.session_state.presentation_data = pptx_file
+                        st.session_state.presentation_data = pptx_file.getvalue()
+                        
                         narrative_full_text = ""
                         for i, slide in enumerate(slides_data.get("slides", [])):
                             narrative_full_text += f"Diapositiva {i+1}: {slide.get('title', '')}\n\n{slide.get('narrative', '')}\n\nDescripción de imagen: {slide.get('image_description', '')}\n\n---\n\n"
                         st.session_state.narrative_data = narrative_full_text.encode('utf-8')
-                        st.success("¡Presentación generada con éxito! 🎉")
-                    else:
-                        st.error("No se pudo crear el archivo PowerPoint.")
-                else:
-                    st.error("La IA no pudo generar un esquema válido.")
+                        st.success("¡Éxito! 🎉")
 
 with col2:
     if st.button("Limpiar"):
         for key in ['presentation_data', 'narrative_data']:
-            if key in st.session_state:
-                del st.session_state[key]
+            if key in st.session_state: del st.session_state[key]
         st.rerun()
 
 if st.session_state.get('presentation_data'):
     st.markdown("---")
-    st.header("✅ ¡Listo para descargar!")
+    st.header("✅ ¡Listo!")
     if 'narrative_data' in st.session_state:
-        with st.expander("📝 Ver Narrativa para el Presentador"):
+        with st.expander("📝 Ver Narrativa"):
             st.text(st.session_state.narrative_data.decode('utf-8'))
-        
-    col1_dl, col2_dl = st.columns(2)
-    file_name_prefix = re.sub(r'[\s/\\:*?"<>|]', '_', presentation_title).lower() or 'presentacion'
-    with col1_dl:
-        st.download_button("Descargar presentación (.pptx)", st.session_state.presentation_data, f"{file_name_prefix}.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation")
-    if 'narrative_data' in st.session_state:
-        with col2_dl:
-            st.download_button("Descargar narrativa (.txt)", st.session_state.narrative_data, f"narrativa_{file_name_prefix}.txt", "text/plain")
+            
+    st.download_button("Descargar PPTX", st.session_state.presentation_data, "presentacion.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+    st.download_button("Descargar Narrativa (.txt)", st.session_state.narrative_data, "narrativa.txt", "text/plain")
