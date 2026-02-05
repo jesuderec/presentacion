@@ -42,6 +42,9 @@ def generate_slides_data_with_ai(texto_contenido_principal, texto_estructura_bas
 
     # --- PROMPT "CATEDRÁTICO" ORIGINAL ---
     prompt = f"""
+    **REGLA DE FIDELIDAD ABSOLUTA:** 1. USA ÚNICAMENTE la información del "DOCUMENTO FUENTE" proporcionado abajo. 
+    2. Si el documento está vacío o no contiene datos concretos, NO INVENTES un tema general.
+    3. Si el texto trata sobre un tema específico (ej. "Contabilidad", "Biología"), NO hables de "Fundamentos Teóricos Generales", habla de ese tema específico.
     **ROL Y OBJETIVO:**
     Actúa como un **Catedrático Universitario** y diseñador de material didáctico. Tu objetivo es transformar un documento académico en el guion para una **clase magistral**, presentada en formato JSON para PowerPoint. La calidad debe ser impecable, profesional y académicamente rigurosa.
 
