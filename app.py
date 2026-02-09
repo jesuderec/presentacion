@@ -82,7 +82,8 @@ def generate_slides_data_with_ai(texto_contenido_principal, texto_estructura_bas
             payload = {
                 "model": "deepseek-chat", 
                 "messages": [{"role": "user", "content": prompt}], 
-                "temperature": 0.7, 
+                "temperature": 0.1, 
+                "max_tokens": 4096,
                 "response_format": {"type": "json_object"}
             }
             response = requests.post(api_url, headers=headers, data=json.dumps(payload))
