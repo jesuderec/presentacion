@@ -1,7 +1,8 @@
 import streamlit as st
 import logging
 from docx import Document
-from docx.shared import Pt, RGBColor
+from docx.shared import Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from io import BytesIO
 import requests
 import json
@@ -12,7 +13,7 @@ import io
 import re
 import openai
 
-# --- Configuración básica ---
+# --- Configuración de Registro ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def get_api_key(model_name):
@@ -26,41 +27,44 @@ def setup_openai_client(api_key):
     openai.api_key = api_key
 
 def optimize_text_for_ai(text_content):
+    if not text_content: return ""
     cleaned_text = re.sub(r'[^\w\s.,?!¡¿]', '', text_content, flags=re.UNICODE)
     return re.sub(r'\s+', ' ', cleaned_text).strip()
 
-# --- Generación de Datos con IA (Prompt Estilo Word/Gems) ---
-def generate_content_with_ai(texto_principal, num_slides, model_name, api_key):
-    texto_principal = optimize_text_for_ai(texto_principal)
+# --- Generación de Contenido con IA ---
+def generate_academic_content(texto_base, num_slides, model_name, api_key):
+    texto_base = optimize_text_for_ai(texto_base)
 
     prompt = f"""
     ## ROL
-    Actúa como un Docente Universitario experto y Diseñador Instruccional.
-    
-    ## OBJETIVO
-    Crea un documento de planificación para una clase magistral basada en el "CONTENIDO FUENTE".
-    Debes generar exactamente {num_slides + 2} secciones (diapositivas virtuales).
+    Eres un Catedrático Universitario experto. Analiza el "MATERIAL DE ESTUDIO" proporcionado para crear una planificación docente profesional.
 
-    ## CONTENIDO FUENTE:
-    "{texto_principal}"
+    ## MATERIAL DE ESTUDIO:
+    "{texto_base}"
 
-    ## REGLAS PARA CADA SECCIÓN:
-    1. **Título y Contenido Visual:** Puntos clave (máx 20 palabras por punto).
-    2. **Guion del Docente:** Explicación profunda y académica (200-300 palabras).
-    3. **Sugerencias de Imágenes:** Proporciona 3 prompts detallados para generar imágenes que ilustren el concepto.
-    4. **Sugerencias de Videos:** Proporciona 3 temas de búsqueda exactos para YouTube en ESPAÑOL.
+    ## ESTRUCTURA JSON REQUERIDA
+    Genera exactamente {num_slides + 2} secciones (Intro, Desarrollo, Conclusión).
+    Cada sección debe incluir:
+    1. **Título:** Académico.
+    2. **Contenido Visual:** 3-4 bullets (máx. 20 palabras c/u).
+    3. **Narrativa:** Guion docente sólido y argumentado (250-400 palabras).
+    4. **Sugerencias de Imágenes:** 3 prompts detallados (sin texto).
+    5. **Sugerencias de Videos:** 3 temas de búsqueda en YouTube (en ESPAÑOL).
 
-    ## FORMATO DE SALIDA (JSON)
+    ## FORMATO (JSON PURO)
     {{
-      "sections": [
-        {{
-          "title": "Título de la Diapositiva",
-          "visual_content": ["Punto 1", "Punto 2", "Punto 3"],
-          "teacher_script": "Texto del guion...",
-          "image_suggestions": ["Descripción 1", "Descripción 2", "Descripción 3"],
-          "video_suggestions": ["Búsqueda YouTube 1", "Búsqueda YouTube 2", "Búsqueda YouTube 3"]
-        }}
-      ]
+      "clase": {{
+        "titulo_general": "Título de la clase",
+        "secciones": [
+          {{
+            "titulo": "...",
+            "bullets": ["...", "..."],
+            "guion_narrativo": "...",
+            "imagenes_prompts": ["...", "...", "..."],
+            "videos_youtube": ["...", "...", "..."]
+          }}
+        ]
+      }}
     }}
     """
 
@@ -71,10 +75,11 @@ def generate_content_with_ai(texto_principal, num_slides, model_name, api_key):
             payload = {
                 "model": "deepseek-chat", 
                 "messages": [{"role": "user", "content": prompt}], 
-                "response_format": {"type": "json_object"}
+                "response_format": {"type": "json_object"},
+                "temperature": 0.3
             }
             response = requests.post(api_url, headers=headers, data=json.dumps(payload))
-            ai_content = response.json()["choices"][0]["message"]["content"]
+            content = response.json()["choices"][0]["message"]["content"]
         else:
             setup_openai_client(api_key)
             response = openai.chat.completions.create(
@@ -82,93 +87,111 @@ def generate_content_with_ai(texto_principal, num_slides, model_name, api_key):
                 messages=[{"role": "user", "content": prompt}], 
                 response_format={"type": "json_object"}
             )
-            ai_content = response.choices[0].message.content
+            content = response.choices[0].message.content
 
-        return json.loads(ai_content)
+        return json.loads(content)
     except Exception as e:
-        logging.error(f"Error IA: {e}")
+        st.error(f"Error en la comunicación con la IA: {e}")
         return None
 
-# --- Creación del Documento Word ---
-def create_word_document(data, main_title, subtitle):
+# --- Funciones de Archivos ---
+def create_word_doc(data):
     doc = Document()
+    clase = data.get("clase", {})
+    doc.add_heading(clase.get("titulo_general", "Plan de Clase"), 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
     
-    # Título Principal
-    t = doc.add_heading(main_title, 0)
-    if subtitle:
-        doc.add_heading(subtitle, 1)
-    
-    for i, section in enumerate(data.get("sections", [])):
-        doc.add_page_break() if i > 0 else None
+    for i, sec in enumerate(clase.get("secciones", [])):
+        doc.add_page_break()
+        doc.add_heading(f"Sección {i+1}: {sec.get('titulo')}", level=1)
+        doc.add_heading("Contenido Visual", level=2)
+        for b in sec.get("bullets", []):
+            doc.add_paragraph(b, style='List Bullet')
         
-        # Título de Diapositiva
-        doc.add_heading(f"Sección {i+1}: {section.get('title')}", level=1)
+        doc.add_heading("Recursos (3 Imágenes | 3 Videos)", level=2)
+        table = doc.add_table(rows=1, cols=2)
+        table.style = 'Table Grid'
+        hdr_cells = table.rows[0].cells
+        hdr_cells[0].text = 'Prompts de Imagen'
+        hdr_cells[1].text = 'Temas de Video (YouTube)'
         
-        # Contenido Visual
-        doc.add_heading("Contenido Visual (Bullets):", level=2)
-        for bullet in section.get("visual_content", []):
-            doc.add_paragraph(bullet, style='List Bullet')
-        
-        # Guion
-        doc.add_heading("Guion del Docente:", level=2)
-        p_script = doc.add_paragraph(section.get("teacher_script"))
-        p_script.alignment = 3 # Justificado
-        
-        # Imágenes
-        doc.add_heading("Sugerencias de Imágenes (Prompts):", level=2)
-        for img in section.get("image_suggestions", []):
-            doc.add_paragraph(f"📸 {img}", style='List Bullet')
-            
-        # Videos
-        doc.add_heading("Videos Recomendados (YouTube):", level=2)
-        for vid in section.get("video_suggestions", []):
-            doc.add_paragraph(f"🎥 {vid}", style='List Bullet')
+        for img, vid in zip(sec.get("imagenes_prompts", []), sec.get("videos_youtube", [])):
+            row = table.add_row().cells
+            row[0].text = img
+            row[1].text = vid
 
+        doc.add_heading("Narrativa Argumentada", level=2)
+        doc.add_paragraph(sec.get("guion_narrativo")).alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
     return doc
 
-# --- Lector de archivos ---
-def read_text(uploaded_file):
-    if uploaded_file is None: return ""
-    ext = os.path.splitext(uploaded_file.name)[1].lower()
-    if ext == ".txt": return uploaded_file.read().decode("utf-8")
-    elif ext == ".pdf":
-        return "".join([p.extract_text() for p in PdfReader(uploaded_file).pages])
-    elif ext == ".docx":
-        return "\n".join([p.text for p in docx.Document(uploaded_file).paragraphs])
+def create_narrative_txt(data):
+    clase = data.get("clase", {})
+    output = f"NARRATIVA COMPLETA: {clase.get('titulo_general')}\n" + "="*50 + "\n\n"
+    for i, sec in enumerate(clase.get("secciones", [])):
+        output += f"SECCIÓN {i+1}: {sec.get('titulo')}\n" + "-"*30 + "\n"
+        output += f"ARGUMENTACIÓN:\n{sec.get('guion_narrativo')}\n\n"
+        output += "VISUALES: " + " | ".join(sec.get("bullets", [])) + "\n\n"
+    return output.encode('utf-8')
+
+def read_file(file):
+    if file is None: return ""
+    ext = os.path.splitext(file.name)[1].lower()
+    if ext == ".txt": return file.read().decode("utf-8")
+    elif ext == ".pdf": return "".join([p.extract_text() for p in PdfReader(file).pages])
+    elif ext == ".docx": return "\n".join([p.text for p in docx.Document(file).paragraphs])
     return ""
 
 # --- Interfaz Streamlit ---
-st.set_page_config(page_title="Planificador Docente Pro", page_icon="📝")
-st.title("Generador de Guion y Estructura (Word) 🎓")
+st.set_page_config(page_title="Gems Academy Pro", layout="wide")
+st.title("🎓 Planificador Docente Inteligente")
+st.markdown("Genera propuestas de clase en Word y Narrativas en Texto a partir de archivos, temas escritos o ambos.")
 
 with st.sidebar:
-    model_option = st.selectbox("IA de Texto:", ["gpt-4o-mini", "deepseek-chat"])
-    num_slides = st.slider("Número de diapositivas:", 3, 15, 6)
+    st.header("⚙️ Configuración")
+    model = st.selectbox("IA:", ["gpt-4o-mini", "deepseek-chat"])
+    num_slides = st.slider("Bloques de contenido:", 3, 15, 6)
 
-main_title = st.text_input("Título de la Clase:")
-sub_title = st.text_input("Subtítulo:")
-uploaded_file = st.file_uploader("Sube material de apoyo", type=["pdf", "txt", "docx"])
+# SECCIÓN DE ENTRADA FLEXIBLE
+st.header("📄 Fuentes de Información")
+col_file, col_text = st.columns(2)
 
-if st.button("Generar Documento de Word"):
-    if main_title and uploaded_file:
-        with st.spinner("Redactando contenido pedagógico..."):
-            api_key = get_api_key(model_option)
-            texto_base = read_text(uploaded_file)
-            
-            data = generate_content_with_ai(texto_base, num_slides, model_option, api_key)
+with col_file:
+    uploaded_file = st.file_uploader("Opción A: Subir Archivo (PDF, Word, TXT)", type=["pdf", "docx", "txt"])
+
+with col_text:
+    written_topics = st.text_area("Opción B: Escribir Temas o Conceptos", placeholder="Escribe aquí los puntos que quieres que la IA desarrolle...", height=150)
+
+# Lógica de Combinación
+if st.button("🚀 Generar Propuesta Completa"):
+    # Extraer texto de archivo
+    file_text = read_file(uploaded_file) if uploaded_file else ""
+    
+    # Consolidar fuentes
+    full_context = ""
+    if file_text: full_context += f"--- CONTENIDO DEL ARCHIVO ---\n{file_text}\n"
+    if written_topics: full_context += f"--- TEMAS ESCRITOS POR USUARIO ---\n{written_topics}"
+
+    if not full_context.strip():
+        st.warning("Por favor, sube un archivo o escribe algún tema para procesar.")
+    else:
+        with st.spinner("Análisis académico en progreso..."):
+            api_key = get_api_key(model)
+            data = generate_academic_content(full_context, num_slides, model, api_key)
             
             if data:
-                doc = create_word_document(data, main_title, sub_title)
-                target = BytesIO()
-                doc.save(target)
-                
-                st.session_state.word_file = target.getvalue()
-                st.success("¡Documento generado!")
+                st.session_state.word_out = create_word_doc(data)
+                st.session_state.txt_out = create_narrative_txt(data)
+                st.session_state.ready = True
 
-if 'word_file' in st.session_state:
-    st.download_button(
-        label="📥 Descargar Guion en Word (.docx)",
-        data=st.session_state.word_file,
-        file_name=f"Guion_{main_title.replace(' ', '_')}.docx",
-        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    )
+if st.session_state.get('ready'):
+    st.divider()
+    st.success("✅ Documentos generados con éxito.")
+    c1, c2 = st.columns(2)
+    
+    # Preparar descarga de Word
+    word_stream = BytesIO()
+    st.session_state.word_out.save(word_stream)
+    
+    with c1:
+        st.download_button("📥 Descargar Propuesta (Word)", word_stream.getvalue(), "Plan_Clase_Gems.docx")
+    with c2:
+        st.download_button("📥 Descargar Narrativa (Texto)", st.session_state.txt_out, "Narrativa_Argumentada.txt")
